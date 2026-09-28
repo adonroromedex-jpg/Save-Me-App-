@@ -1,5 +1,13 @@
 # 🔐 SAVE ME — React Native + Expo
 
+## Eta entegrasyon an
+
+- Supabase Auth mande imèl/modpas, epi MFA pa SMS anvan aplikasyon an ouvri.
+- Mete `EXPO_PUBLIC_SUPABASE_URL` ak `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` nan `.env` (gade `.env.example`).
+- Aktive founisè SMS ak Phone MFA nan dashboard Supabase anvan teste enskripsyon.
+- Vault la toujou lokal, pa konekte ak Supabase Storage. `src/services/encryption.js` itilize XOR demonstrasyon; li pa pwoteje fichye reyèl yo. Pa mete done prive reyèl ladan l ankò.
+- Enstriksyon ak deskripsyon ki anba yo soti nan premye pwototip la; yo poko tout reflete eta aktyèl la.
+
 ## Strukti Pwojè / Project Structure
 
 ```

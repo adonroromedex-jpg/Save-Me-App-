@@ -10,7 +10,6 @@ import WelcomeScreen from '../screens/WelcomeScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import LoginScreen from '../screens/LoginScreen';
 import BiometricScreen from '../screens/BiometricScreen';
-import NewDeviceScreen from '../screens/NewDeviceScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import VaultScreen from '../screens/VaultScreen';
 import CameraScreen from '../screens/CameraScreen';
@@ -82,7 +81,6 @@ export default function AppNavigator() {
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="NewDevice" component={NewDeviceScreen} />
         </>
       ) : isLocked ? (
         <Stack.Screen name="Biometric" component={BiometricScreen} />

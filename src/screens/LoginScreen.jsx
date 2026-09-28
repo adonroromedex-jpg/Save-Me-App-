@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
+import { loginAccount, startPhoneChallenge, verifyPhoneChallenge } from '../services/auth';
 
 export default function LoginScreen({ navigation }) {
   const { t } = useTranslation();
@@ -10,6 +11,8 @@ export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [challenge, setChallenge] = useState(null);
+  const [otp, setOtp] = useState('');
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -17,12 +20,22 @@ export default function LoginScreen({ navigation }) {
       return;
     }
     setLoading(true);
-    // TODO: Replace with real API call
-    setTimeout(() => {
+    try {
+      const user = await loginAccount(email, password);
+      setChallenge(await startPhoneChallenge(user.user_metadata?.phone));
+    } catch (e) {
+      Alert.alert('Koneksyon pa fini', e.message);
+    } finally {
       setLoading(false);
-      // Mock login success
-      setUser({ email, name: 'Utilisateur', firstName: 'Save Me', id: '1' });
-    }, 1000);
+    }
+  };
+
+  const handleVerify = async () => {
+    try {
+      setUser(await verifyPhoneChallenge({ ...challenge, code: otp.trim() }));
+    } catch (e) {
+      Alert.alert('Kòd SMS pa valide', e.message);
+    }
   };
 
   return (
@@ -39,6 +52,14 @@ export default function LoginScreen({ navigation }) {
           <Text style={s.title}>{t('signIn')}</Text>
         </View>
 
+        {challenge ? <>
+          <Text style={s.forgotText}>Antre kòd SMS ou resevwa a.</Text>
+          <TextInput style={s.input} placeholder="000000" placeholderTextColor="#555"
+            keyboardType="number-pad" maxLength={6} value={otp} onChangeText={setOtp} />
+          <TouchableOpacity style={s.btnPrimary} onPress={handleVerify}>
+            <Text style={s.btnPrimaryText}>Verifye SMS →</Text>
+          </TouchableOpacity>
+        </> : <>
         <TextInput
           style={s.input}
           placeholder={t('email')}
@@ -68,6 +89,7 @@ export default function LoginScreen({ navigation }) {
         <TouchableOpacity onPress={() => navigation.navigate('Register')} style={s.registerLink}>
           <Text style={s.registerText}>Ou pa gen kont? <Text style={s.registerHighlight}>{t('createAccount')}</Text></Text>
         </TouchableOpacity>
+        </>}
       </View>
     </SafeAreaView>
   );

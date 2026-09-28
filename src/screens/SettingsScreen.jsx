@@ -6,6 +6,7 @@ import { View, Text, Switch, TouchableOpacity, StyleSheet, SafeAreaView, ScrollV
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import i18n from '../i18n';
+import { signOutAccount } from '../services/auth';
 
 const LANGS = [
   { code: 'fr', label: '🇫🇷 Français' },
@@ -21,7 +22,14 @@ export function SettingsScreen({ navigation }) {
 
   const handleLogout = () => {
     Alert.alert('Dekonekte', 'Ou vle dekonekte?', [
-      { text: 'Wi, dekonekte', style: 'destructive', onPress: logout },
+      { text: 'Wi, dekonekte', style: 'destructive', onPress: async () => {
+        try {
+          await signOutAccount();
+          logout();
+        } catch (e) {
+          Alert.alert('Dekoneksyon echwe', e.message);
+        }
+      } },
       { text: 'Non', style: 'cancel' },
     ]);
   };

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { sendSMSOTP, sendEmailOTP } from '../services/twoFactor';
+import { registerAccount, startPhoneChallenge, verifyPhoneChallenge } from '../services/auth';
 import { useStore } from '../store/useStore';
 
 export default function RegisterScreen({ navigation }) {
@@ -10,33 +10,38 @@ export default function RegisterScreen({ navigation }) {
   const setUser = useStore(s => s.setUser);
 
   const [form, setForm] = useState({ name: '', firstName: '', birthDate: '', email: '', phone: '', password: '' });
-  const [twoFAMethod, setTwoFAMethod] = useState('sms');
   const [step, setStep] = useState(1); // 1=form, 2=verify OTP
   const [otp, setOtp] = useState('');
+  const [challenge, setChallenge] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleSendOTP = async () => {
-    if (!form.name || !form.firstName || !form.email || !form.phone) {
+    if (!form.name || !form.firstName || !form.email || !form.phone || !form.password) {
       Alert.alert('Erè', 'Tanpri ranpli tout chan obligatwa yo');
       return;
     }
     setLoading(true);
-    if (twoFAMethod === 'sms') {
-      await sendSMSOTP(form.phone);
-    } else {
-      await sendEmailOTP(form.email);
+    try {
+      const data = await registerAccount(form);
+      if (!data.session) {
+        Alert.alert('Konfime imèl ou', 'Tcheke imèl ou, konfime kont la, epi konekte ak modpas ou. Apre sa n ap verifye SMS la.');
+        navigation.navigate('Login');
+        return;
+      }
+      setChallenge(await startPhoneChallenge(form.phone.trim()));
+      setStep(2);
+    } catch (e) {
+      Alert.alert('Enskripsyon pa fini', e.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    setStep(2);
   };
 
   const handleVerifyOTP = async () => {
-    const { verifyOTP } = await import('../services/twoFactor');
-    const result = await verifyOTP(otp);
-    if (result.success) {
-      setUser({ ...form, id: Date.now().toString() });
-    } else {
-      Alert.alert('Erè', 'Kòd la mal oswa ekspire. Eseye ankò.');
+    try {
+      setUser(await verifyPhoneChallenge({ ...challenge, code: otp.trim() }));
+    } catch (e) {
+      Alert.alert('Verifikasyon echwe', e.message);
     }
   };
 
@@ -72,15 +77,7 @@ export default function RegisterScreen({ navigation }) {
               />
             ))}
 
-            <Text style={s.label2FA}>{t('confirm2FA')}</Text>
-            <View style={s.twoFARow}>
-              <TouchableOpacity style={[s.twoFABtn, twoFAMethod === 'sms' && s.twoFAActive]} onPress={() => setTwoFAMethod('sms')}>
-                <Text style={s.twoFAText}>📱 {t('viaSMS')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.twoFABtn, twoFAMethod === 'email' && s.twoFAActive]} onPress={() => setTwoFAMethod('email')}>
-                <Text style={s.twoFAText}>📧 {t('viaEmail')}</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={s.label2FA}>Nimewo SMS ak kòd peyi a (egzanp +509...). Apre konfimasyon imèl, n ap verifye telefòn lan.</Text>
 
             <TouchableOpacity style={s.btnPrimary} onPress={handleSendOTP} disabled={loading}>
               <Text style={s.btnPrimaryText}>{loading ? 'Ap voye...' : 'Kontinye →'}</Text>
@@ -89,7 +86,7 @@ export default function RegisterScreen({ navigation }) {
         ) : (
           <>
             <Text style={s.otpInfo}>
-              Nou voye yon kòd 6 chif nan {twoFAMethod === 'sms' ? form.phone : form.email}
+              Antre kòd SMS nou voye nan {form.phone}
             </Text>
             <TextInput
               style={[s.input, s.otpInput]}
@@ -103,9 +100,6 @@ export default function RegisterScreen({ navigation }) {
             />
             <TouchableOpacity style={s.btnPrimary} onPress={handleVerifyOTP}>
               <Text style={s.btnPrimaryText}>{t('verify')} ✓</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setStep(1)} style={s.resend}>
-              <Text style={s.resendText}>← Chanje enfòmasyon</Text>
             </TouchableOpacity>
           </>
         )}

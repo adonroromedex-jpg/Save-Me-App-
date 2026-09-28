@@ -20,7 +20,10 @@ export const useStore = create((set) => ({
   alerts: [],
 
   // Actions
-  setUser: (user) => set({ user, isAuthenticated: true }),
+  setUser: (user) => set((state) => ({
+    user, isAuthenticated: true,
+    isLocked: state.isAuthenticated ? state.isLocked : false,
+  })),
   logout: () => set({ user: null, isAuthenticated: false, isLocked: true }),
   lockApp: () => set({ isLocked: true }),
   unlockApp: () => set({ isLocked: false }),

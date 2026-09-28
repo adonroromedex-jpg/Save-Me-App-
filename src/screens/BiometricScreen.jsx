@@ -5,12 +5,14 @@ import { useTranslation } from 'react-i18next';
 import { authenticate, isBiometricAvailable, getBiometricType } from '../services/biometrics';
 import { verifyPin, getStoredPinHash } from '../services/encryption';
 import { useStore } from '../store/useStore';
+import { signOutAccount } from '../services/auth';
 
 const KEYS = ['1','2','3','4','5','6','7','8','9','⌫','0','✓'];
 
 export default function BiometricScreen() {
   const { t } = useTranslation();
   const unlockApp = useStore(s => s.unlockApp);
+  const logout = useStore(s => s.logout);
   const [pin, setPin] = useState('');
   const [bioType, setBioType] = useState('none');
   const [error, setError] = useState('');
@@ -37,7 +39,10 @@ export default function BiometricScreen() {
     }
     if (key === '✓') {
       const hash = await getStoredPinHash();
-      if (!hash) { unlockApp(); return; } // No PIN set yet
+      if (!hash) {
+        setError('Pa gen PIN ki konfigire. Itilize byometri oswa rekonekte.');
+        return;
+      }
       const ok = await verifyPin(pin, hash);
       if (ok) {
         unlockApp();
@@ -89,6 +94,12 @@ export default function BiometricScreen() {
             </TouchableOpacity>
           ))}
         </View>
+        <TouchableOpacity onPress={async () => {
+          try { await signOutAccount(); logout(); }
+          catch (e) { setError(e.message); }
+        }}>
+          <Text style={s.sub}>Dekonekte pou rekonekte ak SMS</Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
