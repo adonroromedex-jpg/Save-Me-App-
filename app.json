@@ -1,47 +1,58 @@
 {
   "expo": {
-    "name": "Natively",
-    "slug": "Natively",
+    "name": "Save Me",
+    "slug": "save-me-secure",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/natively-dark.png",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
     "splash": {
-      "image": "./assets/images/natively-dark.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#0A0A1A"
     },
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Natively",
+      "bundleIdentifier": "com.saveme.secure",
+      "buildNumber": "1",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "NSCameraUsageDescription": "Save Me uses the camera to capture private photos and videos stored securely in the app.",
+        "NSFaceIDUsageDescription": "Save Me uses Face ID to protect your private content.",
+        "NSPhotoLibraryUsageDescription": "Save Me does not save to your photo library. All media stays inside the app.",
+        "NSMicrophoneUsageDescription": "Save Me uses the microphone to record secure voice messages."
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/natively-dark.png",
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0A0A1A"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.Natively"
-    },
-    "web": {
-      "favicon": "./assets/images/final_quest_240x240.png",
-      "bundler": "metro"
+      "package": "com.saveme.secure",
+      "versionCode": 1,
+      "compileSdkVersion": 34,
+      "targetSdkVersion": 34,
+      "minSdkVersion": 24,
+      "permissions": [
+        "CAMERA",
+        "USE_BIOMETRIC",
+        "USE_FINGERPRINT",
+        "INTERNET",
+        "RECEIVE_SMS",
+        "READ_PHONE_STATE",
+        "VIBRATE",
+        "FOREGROUND_SERVICE",
+        "RECORD_AUDIO"
+      ]
     },
     "plugins": [
-      "expo-font",
-      "expo-router",
-      "expo-web-browser"
+      "expo-local-authentication",
+      "expo-camera",
+      "expo-secure-store",
+      ["expo-av", { "microphonePermission": "Allow Save Me to record secure voice messages." }]
     ],
-    "scheme": "natively",
-    "experiments": {
-      "typedRoutes": true
-    },
     "extra": {
-      "router": {}
+      "eas": { "projectId": "YOUR_EAS_PROJECT_ID" }
     }
   }
 }
