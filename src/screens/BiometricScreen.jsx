@@ -98,7 +98,7 @@ export default function BiometricScreen() {
           try { await signOutAccount(); logout(); }
           catch (e) { setError(e.message); }
         }}>
-          <Text style={s.sub}>Dekonekte pou rekonekte ak SMS</Text>
+          <Text style={s.sub}>Dekonekte pou rekonekte ak imèl</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

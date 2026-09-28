@@ -25,13 +25,10 @@ export default function App() {
         if (!session) {
           useStore.getState().logout();
         } else {
-          const { data: level, error } = await client.auth.mfa.getAuthenticatorAssuranceLevel();
+          const { data: { user }, error } = await client.auth.getUser();
           if (!active) return;
-          if (!error && level.currentLevel === 'aal2') {
-            useStore.getState().setUser(publicUser(session.user));
-          } else {
-            useStore.getState().logout();
-          }
+          if (error || !user) useStore.getState().logout();
+          else useStore.getState().setUser(publicUser(user));
         }
         setReady(true);
       };

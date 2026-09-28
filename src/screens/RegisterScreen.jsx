@@ -2,33 +2,29 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { registerAccount, startPhoneChallenge, verifyPhoneChallenge } from '../services/auth';
+import { requestEmailCode, verifyEmailCode } from '../services/auth';
 import { useStore } from '../store/useStore';
 
 export default function RegisterScreen({ navigation }) {
   const { t } = useTranslation();
   const setUser = useStore(s => s.setUser);
 
-  const [form, setForm] = useState({ name: '', firstName: '', birthDate: '', email: '', phone: '', password: '' });
+  const [form, setForm] = useState({ name: '', firstName: '', email: '' });
   const [step, setStep] = useState(1); // 1=form, 2=verify OTP
   const [otp, setOtp] = useState('');
-  const [challenge, setChallenge] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const handleSendOTP = async () => {
-    if (!form.name || !form.firstName || !form.email || !form.phone || !form.password) {
+    if (!form.name.trim() || !form.firstName.trim() || !form.email.trim()) {
       Alert.alert('Erè', 'Tanpri ranpli tout chan obligatwa yo');
       return;
     }
     setLoading(true);
     try {
-      const data = await registerAccount(form);
-      if (!data.session) {
-        Alert.alert('Konfime imèl ou', 'Tcheke imèl ou, konfime kont la, epi konekte ak modpas ou. Apre sa n ap verifye SMS la.');
-        navigation.navigate('Login');
-        return;
-      }
-      setChallenge(await startPhoneChallenge(form.phone.trim()));
+      await requestEmailCode(form.email, {
+        createUser: true,
+        profile: { firstName: form.firstName.trim(), name: form.name.trim() },
+      });
       setStep(2);
     } catch (e) {
       Alert.alert('Enskripsyon pa fini', e.message);
@@ -39,7 +35,7 @@ export default function RegisterScreen({ navigation }) {
 
   const handleVerifyOTP = async () => {
     try {
-      setUser(await verifyPhoneChallenge({ ...challenge, code: otp.trim() }));
+      setUser(await verifyEmailCode(form.email, otp));
     } catch (e) {
       Alert.alert('Verifikasyon echwe', e.message);
     }
@@ -59,10 +55,7 @@ export default function RegisterScreen({ navigation }) {
             {[
               { key: 'firstName', placeholder: t('firstName') },
               { key: 'name', placeholder: t('name') },
-              { key: 'birthDate', placeholder: t('birthDate') + ' (JJ/MM/AAAA)' },
               { key: 'email', placeholder: t('email'), keyboardType: 'email-address' },
-              { key: 'phone', placeholder: t('phone'), keyboardType: 'phone-pad' },
-              { key: 'password', placeholder: t('password'), secureTextEntry: true },
             ].map(field => (
               <TextInput
                 key={field.key}
@@ -77,7 +70,7 @@ export default function RegisterScreen({ navigation }) {
               />
             ))}
 
-            <Text style={s.label2FA}>Nimewo SMS ak kòd peyi a (egzanp +509...). Apre konfimasyon imèl, n ap verifye telefòn lan.</Text>
+            <Text style={s.label2FA}>N ap voye yon kòd konfimasyon nan imèl ou.</Text>
 
             <TouchableOpacity style={s.btnPrimary} onPress={handleSendOTP} disabled={loading}>
               <Text style={s.btnPrimaryText}>{loading ? 'Ap voye...' : 'Kontinye →'}</Text>
@@ -86,7 +79,7 @@ export default function RegisterScreen({ navigation }) {
         ) : (
           <>
             <Text style={s.otpInfo}>
-              Antre kòd SMS nou voye nan {form.phone}
+              Antre kòd nou voye nan {form.email}
             </Text>
             <TextInput
               style={[s.input, s.otpInput]}

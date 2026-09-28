@@ -8,7 +8,7 @@ import { useStore } from '../store/useStore';
 const DEMO_ALERTS = [
   { id: '1', type: 'success', title: 'Koneksyon siksè', detail: 'iPhone 14 · Jodi a 9:41 AM', icon: '✅' },
   { id: '2', type: 'warning', title: 'Nouvo aparèy detekte', detail: 'Samsung Galaxy · Yè 11:20 PM · Verifye ✓', icon: '⚠️' },
-  { id: '3', type: 'success', title: '2FA aktivé', detail: 'Lendi 8:00 AM', icon: '🔐' },
+  { id: '3', type: 'success', title: 'Egzanp alèt', detail: 'Lendi 8:00 AM', icon: '🔐' },
   { id: '4', type: 'danger', title: 'Tantativ aksè refize', detail: 'Aparèy enkoni · Samdi 3:15 AM · Bloke ✓', icon: '🚫' },
   { id: '5', type: 'success', title: 'Backup chifre fèt', detail: 'Jedi 2:00 PM', icon: '💾' },
 ];

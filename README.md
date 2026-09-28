@@ -1,150 +1,29 @@
-# 🔐 SAVE ME — React Native + Expo
+# Save Me
 
-## Eta entegrasyon an
+React Native / Expo prototype for Android and iOS. Authentication uses Supabase email one-time codes.
 
-- Supabase Auth mande imèl/modpas, epi MFA pa SMS anvan aplikasyon an ouvri.
-- Mete `EXPO_PUBLIC_SUPABASE_URL` ak `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` nan `.env` (gade `.env.example`).
-- Aktive founisè SMS ak Phone MFA nan dashboard Supabase anvan teste enskripsyon.
-- Vault la toujou lokal, pa konekte ak Supabase Storage. `src/services/encryption.js` itilize XOR demonstrasyon; li pa pwoteje fichye reyèl yo. Pa mete done prive reyèl ladan l ankò.
-- Enstriksyon ak deskripsyon ki anba yo soti nan premye pwototip la; yo poko tout reflete eta aktyèl la.
+## Set up
 
-## Strukti Pwojè / Project Structure
+1. Copy `.env.example` to `.env` and add the project URL and **publishable** key from Supabase Connect. Never add a secret or service-role key to the app.
+2. In Supabase Dashboard → Authentication → Email Templates → Magic Link / OTP, include `{{ .Token }}` in the message so the user receives a code instead of only a link.
+3. For delivery to anyone outside the Supabase project team, set up a custom SMTP provider under Authentication settings. The default sender is for limited testing with project team email addresses.
+4. Run `npm install`, then `npm start` (or `npm run android`).
 
-```
-saveme/
-├── App.js                          ← Entry point
-├── app.json                        ← Expo config (Google Play + App Store)
-├── eas.json                        ← Build config (.aab pou Google Play)
-├── package.json                    ← Tout depandans
-└── src/
-    ├── i18n/
-    │   ├── index.js                ← i18n setup
-    │   └── translations.js         ← FR / EN / ES / HT
-    ├── store/
-    │   └── useStore.js             ← Zustand global state
-    ├── navigation/
-    │   └── AppNavigator.js         ← Stack + Tab navigation
-    ├── services/
-    │   ├── encryption.js           ← AES-256 chiffrement
-    │   ├── biometrics.js           ← Face ID + Emprènt
-    │   └── twoFactor.js            ← OTP SMS + Email
-    └── screens/
-        ├── WelcomeScreen.jsx       ← Ekran byenveni (4 lang)
-        ├── RegisterScreen.jsx      ← Kreye kont + 2FA
-        ├── LoginScreen.jsx         ← Koneksyon
-        ├── BiometricScreen.jsx     ← PIN + Byometri
-        └── AllScreens.jsx          ← Dashboard, Vault, Camera,
-                                       Messages, Alerts, Plans,
-                                       Settings, NewDevice
-```
+## Current state
 
----
+- Register: enter name and email, request an email code, then verify it.
+- Login: request a code for an existing account, then verify it. Supabase stores and restores the session.
+- Logout: ends the Supabase session.
+- The vault, camera, messages, alerts, plans and local lock screens are prototypes. Vault file data is not stored in Supabase. `src/services/encryption.js` uses a demo XOR operation and does **not** encrypt media content. Do not store real private files in this prototype.
+- A successful Android Metro export verifies bundling, not email delivery or end-to-end security.
 
-## ⚡ Kòmanse Rapidman / Quick Start
+## Project layout
 
-### 1. Enstale depandans
-
-```bash
-npm install
-```
-
-### 2. Separe AllScreens.jsx
-
-Kopye chak `export function` nan pwòp fichye pa yo:
-
-- `VaultScreen` → `src/screens/VaultScreen.jsx`
-- `CameraScreen` → `src/screens/CameraScreen.jsx`
-- `MessagesScreen` → `src/screens/MessagesScreen.jsx`
-- `AlertsScreen` → `src/screens/AlertsScreen.jsx`
-- `PlansScreen` → `src/screens/PlansScreen.jsx`
-- `SettingsScreen` → `src/screens/SettingsScreen.jsx`
-- `NewDeviceScreen` → `src/screens/NewDeviceScreen.jsx`
-
-Oswa rete `AllScreens.jsx` epi chanje import yo nan `AppNavigator.js`:
-
-```js
-import { VaultScreen, CameraScreen, MessagesScreen,
-         AlertsScreen, PlansScreen, SettingsScreen,
-         NewDeviceScreen } from '../screens/AllScreens';
-```
-
-### 3. Kouri app la
-
-```bash
-# Android
-npx expo start --android
-
-# iOS
-npx expo start --ios
-
-# Expo Go (pi fasil pou teste)
-npx expo start
-# Enskane QR code ak Expo Go app
-```
-
----
-
-## 🏗️ Bati pou Google Play (.aab)
-
-### Etap 1: Enstale EAS CLI
-```bash
-npm install -g eas-cli
-eas login
-```
-
-### Etap 2: Konfigire
-```bash
-eas build:configure
-```
-
-### Etap 3: Bati AAB
-```bash
-eas build --platform android --profile production
-```
-
-Fichye `.aab` ap disponib sou `expo.dev` pou ou telechaje.
-
-### Etap 4: Mete sou Google Play Console
-1. Ale sou `play.google.com/console`
-2. Kreye nouvo app → `Save Me — Secure Vault`
-3. Package: `com.saveme.secure`
-4. Upload `.aab` fichye a
-5. Ranpli metadata, screenshot, icon
-6. Soumèt pou revizyon (3-7 jou)
-
----
-
-## 🔧 Konfigirasyon Backend (opsyonèl)
-
-Pou SMS 2FA ak email reyèl, kreye yon backend ak:
-
-```
-POST /api/auth/send-sms    → Twilio SMS
-POST /api/auth/send-email  → SendGrid Email
-```
-
-Chanje `API_BASE` nan `src/services/twoFactor.js`:
-```js
-const API_BASE = 'https://your-backend.com/api';
-```
-
----
-
-## 💳 Abonneman Stripe
-
-Ajoute Stripe pou paieman nan `PlansScreen.jsx`:
-```bash
-npm install @stripe/stripe-react-native
-```
-
----
-
-## 🎨 Couleurs Save Me (Drapeau Ayisyen)
-
-| Couleur | Valè |
-|---------|------|
-| Rouge | `#D32F2F` |
-| Bleu | `#1565C0` |
-| Fon | `#0A0A1A` |
-| Kart | `#12122A` |
-| Vèt sekirite | `#4CAF50` |
+- `App.js`: navigation, session restoration, auto-lock hook.
+- `src/screens/`: app screens.
+- `src/navigation/`: stack and tab navigation.
+- `src/services/auth.js`: email OTP request, verification and logout.
+- `src/services/supabase.js`: Supabase client initialization.
+- `src/store/`: local Zustand state.
+- `src/i18n/`: translations.
+- `assets/`: icons and splash images.

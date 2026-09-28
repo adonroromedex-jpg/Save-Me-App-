@@ -3,26 +3,25 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { loginAccount, startPhoneChallenge, verifyPhoneChallenge } from '../services/auth';
+import { requestEmailCode, verifyEmailCode } from '../services/auth';
 
 export default function LoginScreen({ navigation }) {
   const { t } = useTranslation();
   const setUser = useStore(s => s.setUser);
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [challenge, setChallenge] = useState(null);
+  const [codeSent, setCodeSent] = useState(false);
   const [otp, setOtp] = useState('');
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Erè', 'Tanpri antre imèl ak modpas ou');
+    if (!email.trim()) {
+      Alert.alert('Erè', 'Tanpri antre imèl ou');
       return;
     }
     setLoading(true);
     try {
-      const user = await loginAccount(email, password);
-      setChallenge(await startPhoneChallenge(user.user_metadata?.phone));
+      await requestEmailCode(email);
+      setCodeSent(true);
     } catch (e) {
       Alert.alert('Koneksyon pa fini', e.message);
     } finally {
@@ -32,9 +31,9 @@ export default function LoginScreen({ navigation }) {
 
   const handleVerify = async () => {
     try {
-      setUser(await verifyPhoneChallenge({ ...challenge, code: otp.trim() }));
+      setUser(await verifyEmailCode(email, otp));
     } catch (e) {
-      Alert.alert('Kòd SMS pa valide', e.message);
+      Alert.alert('Kòd imèl pa valide', e.message);
     }
   };
 
@@ -52,12 +51,15 @@ export default function LoginScreen({ navigation }) {
           <Text style={s.title}>{t('signIn')}</Text>
         </View>
 
-        {challenge ? <>
-          <Text style={s.forgotText}>Antre kòd SMS ou resevwa a.</Text>
+        {codeSent ? <>
+          <Text style={s.forgotText}>Antre kòd ou resevwa nan {email}.</Text>
           <TextInput style={s.input} placeholder="000000" placeholderTextColor="#555"
             keyboardType="number-pad" maxLength={6} value={otp} onChangeText={setOtp} />
           <TouchableOpacity style={s.btnPrimary} onPress={handleVerify}>
-            <Text style={s.btnPrimaryText}>Verifye SMS →</Text>
+            <Text style={s.btnPrimaryText}>Verifye imèl →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={s.registerLink} onPress={() => setCodeSent(false)}>
+            <Text style={s.registerText}>Chanje imèl</Text>
           </TouchableOpacity>
         </> : <>
         <TextInput
@@ -69,21 +71,8 @@ export default function LoginScreen({ navigation }) {
           keyboardType="email-address"
           autoCapitalize="none"
         />
-        <TextInput
-          style={s.input}
-          placeholder={t('password')}
-          placeholderTextColor="#555"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-        />
-
-        <TouchableOpacity style={s.forgot}>
-          <Text style={s.forgotText}>Bliye modpas ou? / Forgot password?</Text>
-        </TouchableOpacity>
-
         <TouchableOpacity style={s.btnPrimary} onPress={handleLogin} disabled={loading}>
-          <Text style={s.btnPrimaryText}>{loading ? 'Koneksyon...' : t('signIn') + ' →'}</Text>
+          <Text style={s.btnPrimaryText}>{loading ? 'Ap voye...' : 'Voye kòd imèl →'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => navigation.navigate('Register')} style={s.registerLink}>
