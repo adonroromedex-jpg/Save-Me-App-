@@ -83,12 +83,12 @@ export default function RegisterScreen({ navigation }) {
             </Text>
             <TextInput
               style={[s.input, s.otpInput]}
-              placeholder="000000"
+              placeholder="Kòd imèl"
               placeholderTextColor="#555"
               value={otp}
               onChangeText={setOtp}
               keyboardType="numeric"
-              maxLength={6}
+              maxLength={8}
               textAlign="center"
             />
             <TouchableOpacity style={s.btnPrimary} onPress={handleVerifyOTP}>

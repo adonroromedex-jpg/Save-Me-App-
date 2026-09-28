@@ -53,8 +53,8 @@ export default function LoginScreen({ navigation }) {
 
         {codeSent ? <>
           <Text style={s.forgotText}>Antre kòd ou resevwa nan {email}.</Text>
-          <TextInput style={s.input} placeholder="000000" placeholderTextColor="#555"
-            keyboardType="number-pad" maxLength={6} value={otp} onChangeText={setOtp} />
+          <TextInput style={s.input} placeholder="Kòd imèl" placeholderTextColor="#555"
+            keyboardType="number-pad" maxLength={8} value={otp} onChangeText={setOtp} />
           <TouchableOpacity style={s.btnPrimary} onPress={handleVerify}>
             <Text style={s.btnPrimaryText}>Verifye imèl →</Text>
           </TouchableOpacity>
