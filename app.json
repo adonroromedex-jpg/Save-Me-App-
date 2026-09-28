@@ -38,8 +38,6 @@
         "USE_BIOMETRIC",
         "USE_FINGERPRINT",
         "INTERNET",
-        "RECEIVE_SMS",
-        "READ_PHONE_STATE",
         "VIBRATE",
         "FOREGROUND_SERVICE",
         "RECORD_AUDIO"
