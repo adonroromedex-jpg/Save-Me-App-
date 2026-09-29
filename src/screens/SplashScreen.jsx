@@ -219,6 +219,10 @@ const s = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 4,
   },
   logo: {
     width: 120,

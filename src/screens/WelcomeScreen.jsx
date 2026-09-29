@@ -1,6 +1,6 @@
 // src/screens/WelcomeScreen.jsx
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { changeAppLanguage } from '../i18n/language';
 import { useStore } from '../store/useStore';
@@ -25,10 +25,8 @@ export default function WelcomeScreen({ navigation }) {
     <SafeAreaView style={styles.container}>
       {/* Logo */}
       <View style={styles.logoArea}>
-        <View style={styles.shieldOuter}>
-          <View style={styles.shieldInner}>
-            <Text style={styles.shieldCheck}>✓</Text>
-          </View>
+        <View style={styles.logoWhiteBackground}>
+          <Image source={require('../../assets/logo_save_me.png')} style={styles.logoImage} resizeMode="contain" />
         </View>
         <Text style={styles.appName}>SAVE ME</Text>
         <Text style={styles.tagline}>{t('tagline')}</Text>
@@ -65,9 +63,8 @@ export default function WelcomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0A0A1A', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   logoArea: { alignItems: 'center', marginBottom: 32 },
-  shieldOuter: { width: 80, height: 80, borderRadius: 40, borderWidth: 2, borderColor: '#D32F2F', alignItems: 'center', justifyContent: 'center', marginBottom: 16, backgroundColor: 'rgba(21,101,192,0.2)' },
-  shieldInner: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#1565C0', alignItems: 'center', justifyContent: 'center' },
-  shieldCheck: { color: '#fff', fontSize: 24, fontWeight: '700' },
+  logoWhiteBackground: { width: 108, height: 108, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 16 },
+  logoImage: { width: 100, height: 100 },
   appName: { color: '#fff', fontSize: 32, fontWeight: '700', letterSpacing: 4, marginBottom: 8 },
   tagline: { color: '#667', fontSize: 13, textAlign: 'center' },
   selectLang: { color: '#8888AA', fontSize: 12, marginBottom: 12, textTransform: 'uppercase', letterSpacing: 1 },

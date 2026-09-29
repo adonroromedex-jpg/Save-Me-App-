@@ -4,7 +4,7 @@
     "slug": "save-me-secure",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/icon_white.png",
     "userInterfaceStyle": "dark",
     "splash": {
       "image": "./assets/splash.png",
@@ -27,7 +27,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#0A0A1A"
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.saveme.secure",
       "versionCode": 1,
