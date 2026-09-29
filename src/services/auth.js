@@ -7,7 +7,7 @@ export function publicUser(user) {
     firstName: user.user_metadata?.firstName || '',
     name: user.user_metadata?.name || '',
     countryCode: user.user_metadata?.countryCode || '',
-    phoneNumber: user.user_metadata?.phoneNumber || '',
+    phoneNumber: user.user_metadata?.phoneNumber || user.user_metadata?.phone || '',
   };
 }
 
@@ -19,7 +19,11 @@ export async function requestEmailCode(email, { createUser = false, profile = {}
       ...(createUser ? { data: profile } : {}),
     },
   });
-  if (error) throw error;
+  if (error) {
+    // Surface the server code for diagnosis without logging email addresses or tokens.
+    console.warn('Save Me OTP request:', { signup: createUser, code: error.code, status: error.status });
+    throw new Error(`${error.message}${error.code ? ` (${error.code})` : ''}`);
+  }
 }
 
 export async function verifyEmailCode(email, code) {

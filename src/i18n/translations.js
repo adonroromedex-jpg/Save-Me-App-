@@ -1,3 +1,4 @@
+import { exchange } from './exchange';
 // src/i18n/translations.js
 export const resources = {
   fr: {
@@ -323,6 +324,10 @@ export const resources = {
 };
 
 Object.assign(resources.fr.translation, {
+  emailRequestAccepted: "Demande de code acceptée pour {{email}}. Vérifiez votre boîte et les indésirables. Si rien n'arrive, réessayez après le délai.",
+  resendEmailCode: "Renvoyer le code", ownPhoneContact: "C'est votre propre numéro. Choisissez un autre utilisateur.",
+  profilePhoneNeeded: "Ajoutez votre numéro complet dans Paramètres pour être trouvé dans les contacts.",
+  profileSyncFailed: "Le profil n'a pas été synchronisé. Vérifiez votre numéro dans Paramètres.",
   splashPhrase: "Save Me", splashTagline: "Protéger · Partager · Se connecter", splashWelcome: "Bienvenue dans Save Me !",
   unlockBeforeImport: "Déverrouillez l'application puis réessayez.",
   hello: "Bonjour", privatePhoto: "Photo privée", logoutQuestion: "Voulez-vous vous déconnecter ?",
@@ -343,13 +348,17 @@ Object.assign(resources.fr.translation, {
   deleteFile: "Supprimer", deleteFileQuestion: "Supprimer ce fichier du coffre ?",
   newChat: "Nouveau chat", findByPhone: "Rechercher un numéro", phoneContacts: "Contacts du téléphone",
   contactsPermission: "Autorisez l'accès aux contacts pour sélectionner une personne.",
-  contactNotFound: "Ce numéro n'a pas encore de compte Save Me.",
+  contactNotFound: "Aucun autre profil n'est associé à ce numéro exact. Vérifiez l'indicatif et le numéro enregistré dans les paramètres du destinataire.",
   noConversations: "Aucune conversation. Sélectionnez un contact pour commencer.",
   contactPrivacy: "Les contacts restent sur votre téléphone. Seul le numéro choisi est recherché.",
   searchContacts: "Chercher dans les contacts...", countryCodeNeeded: "Ajoutez l'indicatif pays au numéro (+...).",
   writeMessage: "Écrire un message...", chatExpiry: "Les messages expirent 24 h après l'envoi. Les médias reçus restent dans ce chat.",
 });
 Object.assign(resources.en.translation, {
+  emailRequestAccepted: "Code request accepted for {{email}}. Check your inbox and spam. If nothing arrives, retry after the countdown.",
+  resendEmailCode: "Resend code", ownPhoneContact: "This is your own number. Choose another user.",
+  profilePhoneNeeded: "Add your full phone number in Settings so contacts can find you.",
+  profileSyncFailed: "Profile could not be synced. Check your phone number in Settings.",
   splashPhrase: "Save Me", splashTagline: "Protect · Share · Connect", splashWelcome: "Welcome to Save Me!",
   unlockBeforeImport: "Unlock the app and try again.",
   hello: "Hello", privatePhoto: "Private photo", logoutQuestion: "Sign out of Save Me?",
@@ -368,13 +377,17 @@ Object.assign(resources.en.translation, {
   deleteFile: "Delete", deleteFileQuestion: "Delete this file from the vault?",
   newChat: "New chat", findByPhone: "Find by phone", phoneContacts: "Phone contacts",
   contactsPermission: "Allow contacts access to select a person.",
-  contactNotFound: "This number does not have a Save Me account yet.",
+  contactNotFound: "No other profile matches this exact number. Check the country code and the recipient's phone number in Settings.",
   noConversations: "No conversations. Select a contact to begin.",
   contactPrivacy: "Contacts stay on your phone. Only the selected number is looked up.",
   searchContacts: "Search contacts...", countryCodeNeeded: "Add the country calling code to the number (+...).",
   writeMessage: "Write a message...", chatExpiry: "Messages expire 24 hours after sending. Received media stays in this chat.",
 });
 Object.assign(resources.es.translation, {
+  emailRequestAccepted: "Solicitud de código aceptada para {{email}}. Revisa tu correo y spam. Si no llega, vuelve a intentar después de la cuenta atrás.",
+  resendEmailCode: "Reenviar código", ownPhoneContact: "Este es tu propio número. Elige otro usuario.",
+  profilePhoneNeeded: "Añade tu número completo en Ajustes para que tus contactos puedan encontrarte.",
+  profileSyncFailed: "No se pudo sincronizar el perfil. Revisa tu número en Ajustes.",
   splashPhrase: "Save Me", splashTagline: "Proteger · Compartir · Conectar", splashWelcome: "¡Bienvenido a Save Me!",
   unlockBeforeImport: "Desbloquea la aplicación y vuelve a intentarlo.",
   hello: "Hola", privatePhoto: "Foto privada", logoutQuestion: "¿Quieres cerrar sesión?",
@@ -394,13 +407,17 @@ Object.assign(resources.es.translation, {
   deleteFile: "Eliminar", deleteFileQuestion: "¿Eliminar este archivo de la bóveda?",
   newChat: "Nuevo chat", findByPhone: "Buscar número", phoneContacts: "Contactos del teléfono",
   contactsPermission: "Permite el acceso a contactos para elegir una persona.",
-  contactNotFound: "Este número aún no tiene cuenta Save Me.",
+  contactNotFound: "Ningún otro perfil coincide con este número exacto. Revisa el prefijo y el número del destinatario en Ajustes.",
   noConversations: "No hay conversaciones. Elige un contacto para empezar.",
   contactPrivacy: "Los contactos permanecen en tu teléfono. Solo se consulta el número elegido.",
   searchContacts: "Buscar contactos...", countryCodeNeeded: "Agrega el prefijo del país al número (+...).",
   writeMessage: "Escribe un mensaje...", chatExpiry: "Los mensajes vencen 24 h después de enviarlos. Los archivos recibidos quedan en este chat.",
 });
 Object.assign(resources.ht.translation, {
+  emailRequestAccepted: "Demann kòd la aksepte pou {{email}}. Verifye bwat imel ak spam. Si li pa rive, eseye ankò apre kontè a.",
+  resendEmailCode: "Voye kòd la ankò", ownPhoneContact: "Sa se pwòp nimewo ou. Chwazi yon lòt itilizatè.",
+  profilePhoneNeeded: "Ajoute nimewo konplè ou nan Paramèt pou kontak yo ka jwenn ou.",
+  profileSyncFailed: "Pwofil la pa senkronize. Verifye nimewo ou nan Paramèt.",
   splashPhrase: "Save Me", splashTagline: "Pwoteje · Pataje · Konekte", splashWelcome: "Byenveni nan Save Me!",
   unlockBeforeImport: "Debloke app la epi eseye ankò.",
   hello: "Bonjou", privatePhoto: "Foto prive", logoutQuestion: "Ou vle dekonekte?",
@@ -420,9 +437,11 @@ Object.assign(resources.ht.translation, {
   deleteFile: "Efase", deleteFileQuestion: "Efase fichye sa a nan vault la?",
   newChat: "Nouvo chat", findByPhone: "Chèche nimewo", phoneContacts: "Kontak telefòn",
   contactsPermission: "Bay aksè kontak pou chwazi yon moun.",
-  contactNotFound: "Nimewo sa a poko gen kont Save Me.",
+  contactNotFound: "Pa gen lòt pwofil ki matche ak nimewo egzak sa a. Verifye indicatif la ak nimewo moun nan te sove nan Paramèt.",
   noConversations: "Pa gen konvèsasyon. Chwazi yon kontak pou kòmanse.",
   contactPrivacy: "Kontak yo rete nan telefòn ou. Se sèlman nimewo ou chwazi a nou verifye.",
   searchContacts: "Chèche nan kontak...", countryCodeNeeded: "Mete indicatif peyi a devan nimewo a (+...).",
   writeMessage: "Ekri mesaj...", chatExpiry: "Mesaj yo ekspire 24 èdtan apre yo voye. Medya ou resevwa yo rete nan chat sa a.",
 });
+
+for (const language of Object.keys(exchange)) Object.assign(resources[language].translation, exchange[language]);

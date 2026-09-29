@@ -1,10 +1,10 @@
 // src/screens/RegisterScreen.jsx
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { requestEmailCode, verifyEmailCode } from '../services/auth';
 import { useStore } from '../store/useStore';
-import { updateProfile } from '../services/messages';
+import { normalizePhone, updateProfile } from '../services/messages';
 
 export default function RegisterScreen({ navigation }) {
   const { t } = useTranslation();
@@ -14,6 +14,13 @@ export default function RegisterScreen({ navigation }) {
   const [step, setStep] = useState(1); // 1=form, 2=verify OTP
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!resendSeconds) return undefined;
+    const timer = setTimeout(() => setResendSeconds(value => Math.max(0, value - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [resendSeconds]);
 
   const handleSendOTP = async () => {
     if (!form.name.trim() || !form.firstName.trim() || !form.countryCode.trim() || !form.phone.trim() || !form.email.trim()) {
@@ -22,8 +29,8 @@ export default function RegisterScreen({ navigation }) {
     }
     const countryCode = form.countryCode.trim().replace(/[\s()-]/g, '');
     const nationalNumber = form.phone.trim().replace(/[\s()-]/g, '');
-    const phoneNumber = `${countryCode}${nationalNumber}`;
-    if (!/^\+[1-9]\d{0,2}$/.test(countryCode) || !/^\d{4,14}$/.test(nationalNumber) || !/^\+[1-9]\d{6,14}$/.test(phoneNumber)) {
+    const phoneNumber = normalizePhone(nationalNumber, countryCode);
+    if (!/^\+[1-9]\d{0,2}$/.test(countryCode) || !/^\d{4,14}$/.test(nationalNumber) || !phoneNumber) {
       Alert.alert(t('registrationFailed'), t('invalidPhone'));
       return;
     }
@@ -43,6 +50,7 @@ export default function RegisterScreen({ navigation }) {
         },
       });
       setStep(2);
+      setResendSeconds(60);
     } catch (e) {
       Alert.alert(t('registrationFailed'), e.message);
     } finally {
@@ -51,17 +59,18 @@ export default function RegisterScreen({ navigation }) {
   };
 
   const handleVerifyOTP = async () => {
+    if (loading) return;
+    if (!/^\d{6,8}$/.test(otp.trim())) { Alert.alert(t('verificationFailed'), t('invalidCode')); return; }
+    setLoading(true);
     try {
       const verified = await verifyEmailCode(form.email, otp);
-      const number = `${form.countryCode.trim().replace(/[\s()-]/g, '')}${form.phone.trim().replace(/[\s()-]/g, '')}`;
-      try {
-        await updateProfile({ firstName: form.firstName, name: form.name, phoneNumber: number });
-      } catch (profileError) {
-        Alert.alert(t('profile'), profileError.message);
-      }
-      setUser({ ...verified, firstName: form.firstName.trim(), name: form.name.trim(), phoneNumber: number });
+      const number = normalizePhone(form.phone, form.countryCode.trim());
+      await updateProfile({ firstName: form.firstName, name: form.name, phoneNumber: number });
+      setUser({ ...verified, firstName: form.firstName.trim(), name: form.name.trim(), countryCode: form.countryCode.trim(), phoneNumber: number });
     } catch (e) {
       Alert.alert(t('verificationFailed'), e.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -106,7 +115,7 @@ export default function RegisterScreen({ navigation }) {
         ) : (
           <>
             <Text style={s.otpInfo}>
-              {t('codeSentTo', { email: form.email })}
+              {t('emailRequestAccepted', { email: form.email.trim().toLowerCase() })}
             </Text>
             <TextInput
               style={[s.input, s.otpInput]}
@@ -118,8 +127,14 @@ export default function RegisterScreen({ navigation }) {
               maxLength={8}
               textAlign="center"
             />
-            <TouchableOpacity style={s.btnPrimary} onPress={handleVerifyOTP}>
-              <Text style={s.btnPrimaryText}>{t('verify')} ✓</Text>
+            <TouchableOpacity style={s.btnPrimary} onPress={handleVerifyOTP} disabled={loading}>
+              <Text style={s.btnPrimaryText}>{loading ? t('sending') : t('verify')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.resend} onPress={handleSendOTP} disabled={loading || resendSeconds > 0}>
+              <Text style={s.resendText}>{t('resendEmailCode')}{resendSeconds > 0 ? ` (${resendSeconds}s)` : ''}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={s.resend} onPress={() => { setStep(1); setOtp(''); }} disabled={loading}>
+              <Text style={s.resendText}>{t('changeEmail')}</Text>
             </TouchableOpacity>
           </>
         )}

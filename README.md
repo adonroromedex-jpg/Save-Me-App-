@@ -1,46 +1,62 @@
-# Save Me
+# Save Me — Exchange 1
 
-Expo SDK 51 Android/iOS application. This branch is a security-focused development build, **not a finished security product**.
+Android-first Expo SDK 51 test version. This is a development build, not an audited security product.
 
-## Android setup
+## What this version does
 
-1. Keep `.env` local with `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Never put a service-role or secret key in the app.
-2. Run `npm ci`.
-3. New native modules and permissions require regeneration of the ignored native project: `npx expo prebuild --clean --platform android` and then `npx expo run:android --device`. Later JS-only changes can use Metro reload.
+- Text, voice notes with playback before sending, photos and videos; phone contact selection and exact-number search.
+- App camera with audio and a three-minute recording limit at 480p (device support can affect quality).
+- Photo/video chat messages expire **24 hours after the server accepts the completed send**. Uploads have a separate 24-hour cleanup window. Text and voice notes remain.
+- Each photo/video send requires a six-digit code. The sender may explicitly choose to send the code as an encrypted text message. Every reopening requires the code and a fresh server authorization. An open viewer rechecks every five seconds and closes on authorization/network failure (an eight-second request timeout applies).
+- Text and media key envelopes use NaCl authenticated public-key encryption; file bytes use AES-256-GCM. Private keys remain in device SecureStore. Supabase receives encrypted bodies and media, plus routing/expiry metadata and a bcrypt hash of media codes.
+- Personal camera captures and gallery imports stay in the encrypted, local vault until deleted. The separate vault code is required to save/open them. Received content is never offered for vault import, forwarding, export or gallery saving.
+- Files are processed in 1 MiB authenticated chunks. The client cap is **200 MiB per file**, with each encrypted Storage object below 2 MiB. This avoids the old 20/50 MiB *per-file* limit and avoids loading a whole video into JS memory. Overall Storage quota and bandwidth still apply. Imported videos are not guaranteed automatic compression on Android.
+- Contact blocking, per-chat colors, security-number comparison, scrollable paginated history, app locking and Android capture prevention.
+- White launcher icon with safe padding, white native splash and the existing animated in-app splash image. No original splash audio was supplied.
 
-## Supabase setup before chat works
+## Upgrade Supabase before testing chat
 
-1. In the project's SQL Editor, run [`supabase/migrations/20260929_secure_messaging.sql`](supabase/migrations/20260929_secure_messaging.sql). Review the SQL before execution. It creates profiles, messages, exact-phone lookup, row-level security and a **private** `chat-media` bucket. Do not run it against an existing schema with similarly named tables without reviewing conflicts.
-2. In Authentication → Email Templates, edit **both** `Confirm signup` (new accounts) and `Magic Link` (existing accounts). Use a subject such as `Kòd Save Me` and this HTML body for each:
+For an existing installation that already ran the initial chat migration:
 
-   ```html
-   <h2>Kòd koneksyon Save Me</h2>
-   <p>Antre kòd sa a nan aplikasyon an: <strong>{{ .Token }}</strong></p>
-   ```
+1. Run [`supabase/migrations/20260929_repair_profiles_and_media_limits.sql`](supabase/migrations/20260929_repair_profiles_and_media_limits.sql) in SQL Editor if not already applied.
+2. Run [`supabase/migrations/20260929_encrypted_exchange.sql`](supabase/migrations/20260929_encrypted_exchange.sql) **after** the repair migration. This migration is rerunnable. It rejects old clients' message writes; both test phones must update.
+3. Replace and redeploy the existing [`cleanup-expired-media`](supabase/functions/cleanup-expired-media/index.ts) Edge Function. Keep the existing five-minute Cron schedule and Vault secret. The new function deletes all chunks before deleting their parent message. Using the old cleanup function would leave orphaned chunks.
+4. Verify the project's global Storage upload limit is at least 2 MiB. The new migration configures the private bucket for encrypted chunks of up to 2 MiB. Do not run the old media-limit migration again after it.
 
-   Remove `{{ .ConfirmationURL }}` from these templates. The registration flow uses the Confirm signup template, while login uses Magic Link. Keep the Resend SMTP configuration in Supabase Auth.
-3. Deploy `supabase/functions/cleanup-expired-media` as a scheduled Edge Function with service credentials stored **only** in Supabase. Schedule it regularly through Supabase Cron/Vault or another trusted server scheduler. The service-role key must never be shared with the mobile app or committed to Git. Until this is deployed, access to expired items is denied by RLS, but their bytes remain in Storage.
+For a brand-new database, first run `20260929_secure_messaging.sql` once, then the two migrations above in order. Review names against any unrelated existing schema before execution.
 
-## Current behavior
+No SQL or Edge Function deployment is performed by the mobile build. Access expiry is server-enforced; physical deletion follows the scheduled cleanup, normally within the Cron interval. Offline/terminated devices clear their temporary copies on next launch; exact physical erasure on such a device cannot be guaranteed.
 
-- Registration and login use emailed 8-digit OTPs. First name, last name, phone with country code and email are required. The phone is **not verified for ownership**; contact matching must not be treated as identity verification. Existing accounts can add a phone in Settings.
-- Chat looks up only the selected contact's number, never uploads the address book. Text and gallery photo/video messages are visible to sender/recipient through RLS for 24 hours after sending. Received media opens inside chat and is not offered for vault import, gallery export or forwarding. The private bucket uses short signed URLs. Messages and media **are not end-to-end encrypted**; Supabase has access to their plaintext. An authorized recipient may still copy content by other means.
-- Vault imports gallery media or camera captures into app-private storage encrypted with AES-256-GCM. Its key is in SecureStore. The imported original is still in the phone gallery until the user deletes it there. A decrypted preview is temporarily written to app-private cache and removed on close/background; abnormal termination can leave it there until the OS clears cache. Vault items stay local to this device and do not sync between devices.
-- Screen capture prevention is enabled through `expo-screen-capture`: Android uses its secure window flag; iOS cannot reliably prevent screenshots. Another camera, a compromised device or an authorized user's external capture cannot be prevented.
-- Plans screen shows **proposed**, unverified prices and features. Paid selection does not grant access or charge money; billing is not integrated. There is no end-to-end encryption, subscription enforcement, ad system or reliable threat-alert backend yet.
+## Update Android
 
-## Device test sequence
+Keep `.env` local with `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Never put a service-role key in the app.
 
-1. Create a new account and confirm the code from the **Confirm signup** email; sign out and sign back in with a code from **Magic Link**.
-2. Select each language, visit Dashboard, Settings, Vault, Chat and Plans, then restart the app to verify persistence.
-3. Import an image and a short video into Vault; open and close previews, restart, verify both are available and remain out of the app's own chat received-media flow.
-4. On two Android phones with separate accounts and real phone numbers, select a contact, exchange text and media, try an unregistered number, then test expired access. Check RLS with each user and an unrelated third user.
-5. On Android, attempt screenshot and screen recording inside the app; background/foreground and restart to test the lock. Device QA is required; Metro bundling alone does not prove any of this.
+After successfully pulling `restore-uploaded-app`, run:
 
-## Project layout
+```powershell
+npm ci
+npx expo prebuild --clean --platform android
+npx expo run:android --device
+```
 
-- `src/services/vault.js`: local AES-GCM encryption and file lifecycle.
-- `src/services/messages.js`: Supabase profile, contact lookup and messaging.
-- `supabase/migrations/`: server-side schema and access rules.
-- `supabase/functions/`: server-side media cleanup.
-- `src/screens/`: UI and media viewers.
+Stop if a command fails. A Metro reload is insufficient: this update includes a new native file module, icon and permissions/backup changes. The top strip reads **SAVE ME • EXCHANGE 1** (translated) to identify the running JS version. The app's native version is 1.1.0 / versionCode 2.
+
+**Do not uninstall or clear app data during these tests.** This pilot supports one encryption identity per account, stored on one device. It deliberately refuses silent identity replacement. Reinstallation/device migration and encrypted backup recovery are not implemented; losing the keys makes old encrypted content unreadable. Vault codes have no recovery flow.
+
+## Signup and contact troubleshooting
+
+Supabase Authentication → Email Templates must include `{{ .Token }}` in **both Confirm signup and Magic Link**, rather than `{{ .ConfirmationURL }}`. Keep custom SMTP configured. A successful OTP API request means Supabase accepted it, not that the inbox received it. Inspect Auth/SMTP provider delivery logs if only existing accounts receive mail. Registration includes resend cooldown and email correction.
+
+Old accounts without a number must add their full international phone number in Settings. Numbers are not verified by SMS, so matching a number does not prove identity. Contact lookups send only the selected number; the address book is not uploaded. Both accounts must launch this new version online once to register their public keys before exchanging encrypted messages.
+
+## Validation
+
+```sh
+npm test
+npx expo export --platform android
+npx expo prebuild --clean --platform android --no-install
+```
+
+Automated tests cover authenticated encryption/tamper rejection, SQL RLS with three users, key registration, code lockout, server-controlled dates, text/voice retention, blocks and chunk path validation. SQL tests run in PGlite with deterministic **test-only pgcrypto fixtures**; they do not validate real bcrypt, Supabase Storage HTTP, Cron or device behavior. See [SECURITY.md](SECURITY.md) for the security boundaries and [DEVICE_TESTS.md](DEVICE_TESTS.md) for the required phone checks.
+
+Paid plans remain proposals. No billing or paid access is enabled. Message requests, push notifications, full Signal ratcheting, key recovery and multi-device support are not implemented in this pilot.

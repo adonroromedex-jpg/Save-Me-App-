@@ -1,11 +1,35 @@
-# Security status
+# Security status — Exchange 1
 
-This project is in development and has not received an independent security audit. Do not use it for sensitive content yet.
+This implementation has not received an independent security audit. Use test data until the Android and hosted Supabase checks in DEVICE_TESTS.md pass.
 
-The vault encrypts imported file bytes locally with AES-256-GCM and keeps the key in the device's SecureStore. Metadata remains in app-private AsyncStorage. Chat uses Supabase RLS and private Storage but does not provide end-to-end encryption. Android screen capture blocking does not stop another device from filming the screen; iOS screenshots cannot be reliably blocked.
+## Cryptography and identity
 
-The 24-hour rule is enforced by server-side RLS access checks. Permanent deletion of object bytes also requires the scheduled cleanup Edge Function described in README. A signed URL created just before expiry can work for its remaining short lifetime. Device compromise, rooted devices, external cameras, backups and cached previews require dedicated threat-model review.
+- NaCl `crypto_box` (TweetNaCl 1.0.3) encrypts text and file manifests to the recipient's pinned Curve25519 public key; a second envelope permits sender access. Payloads bind message ID and both account IDs. Device private keys are generated with Expo native CSPRNG and stored in SecureStore, device-only on iOS. Published keys are immutable in this pilot.
+- Each file gets a random 256-bit AES-GCM key. Chunks use a random 64-bit per-file nonce prefix plus a 32-bit chunk index; a fresh file key is generated for each file. Authenticated data binds ID, total size, MIME, kind and index. Encrypted manifests bind the chunk count and key. Reordering, modifying and truncating chunks fails authentication/length validation.
+- This is **not Signal Protocol / Double Ratchet**. Static account keys do not provide ratchet-based forward secrecy or post-compromise recovery. First contact is trust-on-first-use. Users can compare full public-key fingerprints through an independent channel. A malicious key directory at first contact remains a risk until verification. Key changes fail closed.
+- One account/device identity, no recovery or rotation UI yet. Never silently regenerate published keys after reinstall. A future explicit, verified rotation and recovery flow is required.
+- Metadata (participants, time, media type, size/chunk count, existence of a conversation) remains visible to the service. Legacy text rows remain marked as unencrypted; legacy media cannot be opened by the new viewer and expires under the old rules.
 
-Phone ownership is not verified because SMS verification was removed. Exact-number discovery has a per-account daily lookup limit, but a matched number is not proof of a person's identity.
+## Codes and online access
 
-Report suspected vulnerabilities privately to the project owner. Do not publish account tokens, private files or service-role keys in an issue.
+The six-digit chat code is an additional online access gate, **not the encryption key**. Supabase receives it over TLS and stores a bcrypt hash. The key envelopes are in a separate table with no direct authenticated/anonymous grants or RLS read policy. An authenticated participant obtains them only through `unlock_media`. Five failures trigger a five-minute lock per account/message. Failure returns commit the attempt counter instead of rolling it back with an exception.
+
+Sending the code in the same encrypted chat is convenient but does not protect against someone who can already read that chat. A malicious server administrator can bypass the code gate but still lacks the device keys needed to decrypt the envelopes. A modified recipient device can retain envelopes/keys after a successful unlock; no app can make an authorized recipient forget decrypted content.
+
+Every photo/video reopening performs fresh online authorization; there is no offline reopen cache or code auto-fill. Open previews use a monotonic deadline calculated from server time and recheck authorization every five seconds with an eight-second network timeout. Changing the device wall clock cannot extend server access. Audio uses the same encrypted file transport, but has no code or 24-hour expiry.
+
+## Vault, temporary files and screen protection
+
+The vault master key is wrapped by AES-GCM using a PBKDF2-SHA256 key (210,000 iterations) derived from the separate six-digit vault code and random salt; the wrapped master is stored in SecureStore. Old vault masters migrate without discarding their encrypted files. Failed unlocks are rate-limited in SecureStore. These local limits are not tamper-proof on a compromised/rooted device; a short PIN is not sufficient protection against offline attacks if secure storage is extracted.
+
+Vault contents use the chunked file format; each per-file manifest/key is sealed under the vault master. Photo/video capture and playback necessarily produce temporary plaintext **inside app-private cache**, never MediaStore/gallery. Preview close, app background, navigation away and launch cleanup remove temporary copies. A crash can leave private temporary files until next launch or OS cleanup. Imported originals remain in the user's original phone gallery. Physical secure erasure on flash storage, exact deletion on an offline/terminated phone and protection from a rooted device are not guaranteed.
+
+Android capture prevention uses the secure Activity window. Sensitive code/media overlays render within that Activity rather than RN 0.74 native Modal dialogs. Video uses inline controls with no native fullscreen presentation. Android backups are disabled. Real phone screenshot/recording and recents-thumbnail tests remain required. iOS cannot reliably block screenshots. Another camera can always record the screen.
+
+## Server boundaries
+
+RPCs own message mutations; authenticated clients cannot change sender, recipient, envelopes, expiry or ready status directly. Server send completion sets the fixed 24-hour photo/video expiry. Text and voice expiry is null. All object bytes are encrypted; RLS restricts chunk upload/download to the appropriate participants and lifecycle. Blocks stop new messages and media authorizations, while existing text history remains visible.
+
+The scheduled cleanup must use the new chunk-aware implementation. It removes object bytes via the Storage API before deleting message rows and their secret envelopes. SQL row deletion alone would orphan Storage data. The five-minute schedule means physical cleanup may occur after access has already expired. Overall account/storage quotas, abuse reporting, message consent requests and production monitoring need separate work.
+
+Phone ownership is not verified. Do not equate phone lookup with identity authentication. Do not publish tokens, media codes or private keys in logs/issues.

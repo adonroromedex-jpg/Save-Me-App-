@@ -1,0 +1,34 @@
+# Exchange 1 — required device tests
+
+Use two updated Android phones and separate test accounts. Keep the installed app data. Apply the new SQL and redeploy chunk-aware cleanup first. Open both apps online to register keys.
+
+| Test | Expected result |
+| --- | --- |
+| Launcher, native splash, in-app splash | White icon, no clipped mark, no black background; existing splash image animates at launch; no sound asset is supplied |
+| New account / existing account | Correct Auth email template supplies a code; errors and resend cooldown visible; verify real SMTP delivery separately |
+| Contact selection | Search by full number; all phone numbers on a contact can be selected; missing-number account repaired in Settings |
+| Text | Both users read Unicode/emoji; unrelated account denied; Supabase body is null and encrypted_body is ciphertext |
+| Voice | Record, stop, listen, discard or send; receiver listens; navigating/background stops audio; voice remains after 24h |
+| Camera | Capture photo/video with audio, back/front cameras; record a full 180 seconds on each target phone; verify encoded file size and memory behavior |
+| Gallery | Import own image/video to chat or vault; original stays in phone gallery; no received media appears there |
+| Media code | Code + confirmation required to send; optional code text is explicit; wrong code denied; fifth failure blocks for five minutes |
+| Reopen | Close then reopen same media; code always requested again; airplane mode cannot reopen it; setting clock backward does not restore expired access |
+| During viewing | Disable internet; viewer closes after heartbeat/request timeout; background or tab navigation closes viewer and deletes temporary plaintext |
+| Expiry | Use a test-only admin query below to shorten a disposable photo's expiry; wait; client/server deny opening; Cron removes every chunk; text/voice unaffected |
+| Vault | Create separate code; capture/import requires code; wrong code denied; restart and reopen using code; personal data survives chat expiry |
+| Capture prevention | Screenshot and recording attempts on chat, code prompt, photo, playing video, vault; also inspect Android recents preview |
+| Blocking | Block peer; new send denied, media access denied; unblock restores new exchanges; old text history remains |
+| Identity | Compare security numbers on both phones; uninstall/reinstall is NOT supported; key mismatch blocks rather than silently replacing keys |
+| Navigation | Scroll long chat, load older messages, keyboard open/close, system back, tab switching while importing/downloading/recording |
+| Languages | Haitian Creole, French, English, Spanish; restart to verify persistence |
+
+Admin-only test on **one disposable photo/video**, never production rows:
+
+```sql
+update public.messages
+set expires_at = now() + interval '30 seconds'
+where id = 'REPLACE_WITH_DISPOSABLE_MESSAGE_UUID'
+  and media_kind in ('image','video');
+```
+
+Repeat wrong-code and RLS checks against the real Supabase project; local database tests use fixtures for pgcrypto. Confirm real Storage upload/download MIME limits, successful Edge Function invocations, and deletion of all chunk objects. The code authoring environment cannot substitute for Gradle/device testing.

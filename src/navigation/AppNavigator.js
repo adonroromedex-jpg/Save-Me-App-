@@ -60,14 +60,7 @@ function MainTabs() {
 
 export default function AppNavigator() {
   const { isAuthenticated, isLocked } = useStore();
-  const [showLockSplash, setShowLockSplash] = useState(false);
-
-  useEffect(() => {
-    // Lè app la vèwouye — montre splash screen anvan login
-    if (isLocked && isAuthenticated) {
-      setShowLockSplash(true);
-    }
-  }, [isLocked]);
+  const [showLockSplash, setShowLockSplash] = useState(true);
 
   // Splash screen anvan re-login apre auto-lock
   if (showLockSplash) {

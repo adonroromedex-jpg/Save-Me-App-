@@ -1,103 +1,76 @@
-// ============================================================
-// src/screens/CameraScreen.jsx
-// ============================================================
-import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, AppState, ActivityIndicator } from 'react-native';
+import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
+import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { importVaultFile, removePickerCopy } from '../services/vault';
+import { hasVaultCode } from '../services/vaultCode';
+import { sendMedia, sendText } from '../services/messages';
+import { useCodePrompt } from '../components/CodePrompt';
+import { MAX_VIDEO_SECONDS } from '../services/mediaLimits';
 
-export function CameraScreen() {
-  const { t } = useTranslation();
-  const [permission, requestPermission] = useCameraPermissions();
-  const [facing, setFacing] = useState('back');
-  const [mode, setMode] = useState('picture');
-  const [capturing, setCapturing] = useState(false);
-  const [recording, setRecording] = useState(false);
-  const cameraRef = useRef(null);
-  const userId = useStore(s => s.user?.id);
-  const setFiles = useStore(s => s.setFiles);
-
-  if (!permission) return <View style={cs.container}><Text style={cs.msg}>{t('sending')}</Text></View>;
-  if (!permission.granted) {
-    return (
-      <SafeAreaView style={cs.container}>
-        <Text style={cs.msg}>📷 {t('cameraPermission')}</Text>
-        <TouchableOpacity style={cs.permBtn} onPress={requestPermission}>
-          <Text style={cs.permBtnText}>{t('allowCamera')}</Text>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
-
-  const takePicture = async () => {
-    if (!cameraRef.current || capturing) return;
-    setCapturing(true);
-    try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.8, base64: false });
-      try {
-        const next = await importVaultFile(userId, { ...photo, type: 'image', mimeType: 'image/jpeg' });
-        setFiles(next);
-        Alert.alert(t('camera'), t('savedToVault'));
-      } finally { await removePickerCopy(photo).catch(() => {}); }
-    } catch (e) {
-      Alert.alert(t('camera'), e.message);
-    }
-    setCapturing(false);
-  };
-
-  const toggleRecording = async () => {
-    if (recording) { cameraRef.current?.stopRecording(); return; }
-    if (!cameraRef.current || capturing) return;
-    setRecording(true);
-    try {
-      const video = await cameraRef.current.recordAsync({ maxDuration: 30 });
-      if (video?.uri) {
-        try {
-          setFiles(await importVaultFile(userId, { ...video, type: 'video', mimeType: 'video/mp4' }));
-          Alert.alert(t('camera'), t('savedToVault'));
-        } finally { await removePickerCopy(video).catch(() => {}); }
+export function CameraScreen({ route, navigation }) {
+  const {t}=useTranslation();const {askCode,codeModal}=useCodePrompt();
+  const [permission,requestPermission]=useCameraPermissions(),[microphone,requestMicrophone]=useMicrophonePermissions();
+  const [facing,setFacing]=useState('back'),[mode,setMode]=useState('picture'),[busy,setBusy]=useState(false),[recording,setRecording]=useState(false);
+  const [seconds,setSeconds]=useState(0),[progress,setProgress]=useState(null),[active,setActive]=useState(AppState.currentState==='active');
+  const camera=useRef(null),valid=useRef(0),working=useRef(false);
+  const focused=useIsFocused();const userId=useStore(s=>s.user?.id),setFiles=useStore(s=>s.setFiles);
+  const peer=route.params?.chatPeer;
+  useFocusEffect(useCallback(()=>()=>{valid.current++;camera.current?.stopRecording();},[]));
+  useEffect(()=>{const sub=AppState.addEventListener('change',state=>{setActive(state==='active');if(state!=='active'){valid.current++;camera.current?.stopRecording();}});return()=>{valid.current++;sub.remove();};},[]);
+  useEffect(()=>{if(!recording)return;const timer=setInterval(()=>setSeconds(n=>n+1),1000);return()=>clearInterval(timer);},[recording]);
+  const save=async(asset,token)=>{
+    try{
+      if(token!==valid.current || AppState.currentState!=='active' || useStore.getState().isLocked)return;
+      if(peer){
+        const code=await askCode({create:true,shareOption:true});if(!code)return;
+        await sendMedia(userId,peer.id,asset,code.pin,setProgress);
+        if(code.share)try{await sendText(userId,peer.id,t('sentCode',{code:code.pin}));}catch{Alert.alert(t('messages'),t('sendFailedCode'));}
+        navigation.setParams({chatPeer:null});navigation.navigate('Messages');
+      }else{
+        const exists=await hasVaultCode(userId);
+        const code=await askCode({title:t(exists?'vaultCode':'vaultCodeSetup'),hint:t('vaultCodeHint'),create:!exists});if(!code)return;
+        setFiles(await importVaultFile(userId,asset,code.pin));Alert.alert(t('camera'),t('captureSaved'));
       }
-    } catch (e) { Alert.alert(t('camera'), e.message); }
-    finally { setRecording(false); }
+    }finally{await removePickerCopy(asset).catch(()=>{});}
   };
-
-  return (
-    <View style={cs.container}>
-      <CameraView style={cs.camera} facing={facing} mode={mode} mute ref={cameraRef}>
-        <View style={cs.overlay}>
-          <View style={cs.badge}><Text style={cs.badgeText}>🔒 {t('cameraPrivate')}</Text></View>
-          <View style={cs.controls}>
-            <TouchableOpacity style={cs.flipBtn} disabled={recording} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
-              <Text style={{ fontSize: 24 }}>🔄</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={cs.captureBtn} onPress={mode === 'video' ? toggleRecording : takePicture} disabled={capturing}>
-              <View style={cs.captureInner} />
-            </TouchableOpacity>
-            <TouchableOpacity disabled={recording || capturing} onPress={() => setMode(current => current === 'picture' ? 'video' : 'picture')}>
-              <Text style={cs.badgeText}>{mode === 'picture' ? t('video') : t('photo')}{recording ? ' ●' : ''}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </CameraView>
+  const capture=async()=>{
+    if(recording){camera.current?.stopRecording();return;}
+    if(!camera.current || working.current)return;
+    working.current=true;let token=valid.current;setBusy(true);
+    try{
+      if(mode==='video'){
+        const allowed=microphone?.granted || (await requestMicrophone()).granted;
+        if(!allowed)throw new Error(t('microphonePermission'));
+        token=valid.current;
+        setSeconds(0);setRecording(true);
+        const video=await camera.current.recordAsync({maxDuration:MAX_VIDEO_SECONDS});setRecording(false);
+        if(video?.uri)await save({...video,type:'video',mimeType:'video/mp4'},token);
+      }else{
+        const photo=await camera.current.takePictureAsync({quality:0.85,base64:false});
+        await save({...photo,type:'image',mimeType:'image/jpeg'},token);
+      }
+    }catch(e){Alert.alert(t('camera'),e.message);}finally{working.current=false;setRecording(false);setBusy(false);setProgress(null);}
+  };
+  if(!permission)return <View style={s.container}><ActivityIndicator /></View>;
+  if(!permission.granted)return <View style={s.container}><Text style={s.hint}>{t('cameraPermission')}</Text><TouchableOpacity style={s.button} onPress={requestPermission}><Text style={s.text}>{t('allowCamera')}</Text></TouchableOpacity></View>;
+  return <View style={s.container}>{codeModal}
+    <View style={s.header}><Text style={s.text}>{peer?t('chatTarget',{name:`${peer.first_name||''} ${peer.last_name||''}`}):t('vaultTarget')}</Text>
+      {!!peer && <TouchableOpacity disabled={busy} onPress={()=>navigation.setParams({chatPeer:null})}><Text style={s.link}>{t('vault')}</Text></TouchableOpacity>}
     </View>
-  );
+    {focused && active && <CameraView style={{flex:1,width:'100%'}} ref={camera} facing={facing} mode={mode} videoQuality="480p" mute={false} />}
+    <View style={s.controls}>
+      <Text style={s.hint}>{recording?t('cameraRecording',{seconds}):t('videoLimit')}</Text>
+      {busy && !recording && <ActivityIndicator color="#82B9FF" />}{progress!==null && <Text style={s.text}>{progress}%</Text>}
+      <View style={s.row}>
+        <TouchableOpacity disabled={busy} onPress={()=>setFacing(f=>f==='back'?'front':'back')} style={s.button}><Text style={s.text}>↺</Text></TouchableOpacity>
+        <TouchableOpacity disabled={busy && !recording} onPress={capture} style={[s.shutter,recording&&{backgroundColor:'#D32F2F'}]} accessibilityLabel={recording?t('stopRecording'):t('camera')}><Text style={{fontSize:26}}>{recording?'■':'●'}</Text></TouchableOpacity>
+        <TouchableOpacity disabled={busy} onPress={()=>setMode(m=>m==='picture'?'video':'picture')} style={s.button}><Text style={s.text}>{mode==='picture'?t('video'):t('photo')}</Text></TouchableOpacity>
+      </View>
+    </View>
+  </View>;
 }
-
-const cs = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0A0A1A', alignItems: 'center', justifyContent: 'center' },
-  camera: { flex: 1, width: '100%' },
-  overlay: { flex: 1, justifyContent: 'space-between', padding: 20 },
-  badge: { alignSelf: 'center', marginTop: 50, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
-  badgeText: { color: '#4CAF50', fontSize: 11 },
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingBottom: 30 },
-  flipBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'center' },
-  captureBtn: { width: 70, height: 70, borderRadius: 35, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: 3, borderColor: '#D32F2F' },
-  captureInner: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#D32F2F' },
-  msg: { color: '#fff', fontSize: 16, textAlign: 'center', padding: 24 },
-  permBtn: { backgroundColor: '#D32F2F', borderRadius: 12, padding: 14, marginTop: 16 },
-  permBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-});
-
+const s=StyleSheet.create({container:{flex:1,backgroundColor:'#0A0A1A',alignItems:'center',justifyContent:'center'},header:{width:'100%',padding:14,flexDirection:'row',justifyContent:'space-between'},text:{color:'#fff',fontSize:14},link:{color:'#82B9FF'},hint:{color:'#AAB',fontSize:13,textAlign:'center',margin:12},controls:{width:'100%',paddingBottom:20},row:{flexDirection:'row',alignItems:'center',justifyContent:'space-around'},button:{padding:14,borderRadius:16,backgroundColor:'#25253B'},shutter:{width:72,height:72,borderRadius:36,backgroundColor:'#fff',alignItems:'center',justifyContent:'center',borderWidth:4,borderColor:'#E25566'}});
 export default CameraScreen;

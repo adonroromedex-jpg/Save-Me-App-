@@ -26,19 +26,21 @@ export default function SplashScreen({ onFinish }) {
   ).current;
 
   useEffect(() => {
-    startAnimation();
+    const cleanup = startAnimation();
+    return cleanup;
   }, []);
 
   const startAnimation = () => {
     // Kurseur kliyote
-    Animated.loop(
+    const cursorLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(cursorOpacity, { toValue: 0, duration: 500, useNativeDriver: true }),
         Animated.timing(cursorOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
       ])
-    ).start();
+    );
+    cursorLoop.start();
 
-    Animated.sequence([
+    const sequence = Animated.sequence([
       // 1. Imaj parèt (0.8s)
       Animated.parallel([
         Animated.timing(imageOpacity, {
@@ -98,14 +100,14 @@ export default function SplashScreen({ onFinish }) {
       // 5. Tann 5 segonn total (rès tan an)
       Animated.delay(1500),
 
-    ]).start(() => {
-      onFinish?.();
-    });
+    ]);
+    sequence.start(({ finished }) => { if (finished) onFinish?.(); });
+    return () => { cursorLoop.stop(); sequence.stop(); };
   };
 
   return (
     <View style={s.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FDF0F5" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
       {/* Imaj fi a */}
       <Animated.View style={[s.imageContainer, {
@@ -115,7 +117,7 @@ export default function SplashScreen({ onFinish }) {
         <Image
           source={require('../../assets/splash.png')}
           style={s.image}
-          resizeMode="cover"
+          resizeMode="contain"
         />
         <View style={s.imageFade} />
       </Animated.View>
@@ -189,7 +191,7 @@ export default function SplashScreen({ onFinish }) {
 const s = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FDF0F5',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
@@ -207,7 +209,6 @@ const s = StyleSheet.create({
     bottom: 0, left: 0, right: 0,
     height: 100,
     backgroundColor: 'transparent',
-    backgroundImage: 'linear-gradient(transparent, #FDF0F5)',
   },
   bottomContent: {
     flex: 1,

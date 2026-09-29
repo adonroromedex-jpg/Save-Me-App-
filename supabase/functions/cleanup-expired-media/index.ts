@@ -13,13 +13,13 @@ Deno.serve(async request => {
   let deleted = 0;
   try {
     for (let page = 0; page < 100; page++) {
-      const { data, error } = await db.from('messages').select('id,media_path')
+      const { data, error } = await db.from('messages').select('id,media_path,media_parts')
         .lt('expires_at', new Date().toISOString()).order('expires_at').limit(100);
       if (error) throw error;
       if (!data?.length) break;
       for (const row of data) {
         if (row.media_path) {
-          const removal = await db.storage.from('chat-media').remove([row.media_path]);
+          const removal = await db.storage.from('chat-media').remove(row.media_parts ? Array.from({ length: row.media_parts }, (_, i) => `${row.media_path}/${i}.bin`) : [row.media_path]);
           if (removal.error) throw removal.error;
         }
         const removal = await db.from('messages').delete().eq('id', row.id);

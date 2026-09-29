@@ -1,20 +1,29 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, FlatList, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import PrivateVideo from '../components/PrivateVideo';
+import { SecureOverlay } from '../components/SecureOverlay';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, AppState, FlatList, Image,  StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Video, ResizeMode } from 'expo-av';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import { useCodePrompt } from '../components/CodePrompt';
+import { hasVaultCode } from '../services/vaultCode';
 import { useStore } from '../store/useStore';
 import { deleteVaultFile, importVaultFile, listVaultFiles, openVaultFile, removePickerCopy, removeVaultPreview } from '../services/vault';
 
 export default function VaultScreen() {
   const { t } = useTranslation();
+  const { askCode, codeModal } = useCodePrompt();
+  const getCode = async () => {
+    const exists = await hasVaultCode(userId);
+    return askCode({ title: t(exists ? 'vaultCode' : 'vaultCodeSetup'), hint: t('vaultCodeHint'), create: !exists });
+  };
   const userId = useStore(s => s.user?.id);
   const setFiles = useStore(s => s.setFiles);
   const [files, updateFiles] = useState([]);
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(null);
+  const previewEpoch = useRef(0);
 
   useFocusEffect(useCallback(() => {
     let active = true;
@@ -24,12 +33,15 @@ export default function VaultScreen() {
   }, [userId, t, setFiles]));
 
   const closePreview = useCallback(() => {
+    previewEpoch.current++;
     setPreview(current => { if (current) removeVaultPreview(current.uri).catch(() => {}); return null; });
   }, []);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => { if (state !== 'active') closePreview(); });
     return () => { subscription.remove(); closePreview(); };
   }, [closePreview]);
+
+  useFocusEffect(useCallback(() => () => closePreview(), [closePreview]));
 
   const pickMedia = async () => {
     if (busy) return;
@@ -41,7 +53,9 @@ export default function VaultScreen() {
     setBusy(true);
     try {
       if (useStore.getState().isLocked) throw new Error(t('unlockBeforeImport'));
-      const next = await importVaultFile(userId, asset); updateFiles(next); setFiles(next);
+      const code = await getCode();
+      if (!code) return;
+      const next = await importVaultFile(userId, asset, code.pin); updateFiles(next); setFiles(next);
     }
     catch (e) { Alert.alert(t('vault'), e.message); }
     finally { await removePickerCopy(asset).catch(() => {}); setBusy(false); }
@@ -49,7 +63,13 @@ export default function VaultScreen() {
 
   const showFile = async item => {
     setBusy(true);
-    try { setPreview({ uri: await openVaultFile(userId, item), type: item.type }); }
+    try {
+      const code = await getCode(); if (!code) return;
+      const epoch = previewEpoch.current;
+      const uri = await openVaultFile(userId, item, code.pin);
+      if (epoch !== previewEpoch.current) { await removeVaultPreview(uri); return; }
+      setPreview({ uri, type: item.type });
+    }
     catch (e) { Alert.alert(t('vault'), e.message); }
     finally { setBusy(false); }
   };
@@ -63,7 +83,7 @@ export default function VaultScreen() {
   ]);
 
   const visible = files.filter(f => `${f.type} ${f.createdAt}`.toLowerCase().includes(search.toLowerCase()));
-  return <View style={s.container}>
+  return <View style={s.container}>{codeModal}
     <View style={s.header}><Text style={s.title}>🔐 {t('vault')}</Text>
       <TouchableOpacity onPress={pickMedia} disabled={busy} style={s.button}><Text style={s.buttonText}>+ {t('addFile')}</Text></TouchableOpacity>
     </View>
@@ -78,12 +98,12 @@ export default function VaultScreen() {
         <Text style={s.meta}>{(item.size / 1048576).toFixed(1)} MB · AES-256-GCM</Text>
       </TouchableOpacity>}
     />
-    <Modal visible={!!preview} onRequestClose={closePreview} animationType="fade">
+    <SecureOverlay visible={!!preview} onRequestClose={closePreview} animationType="fade">
       <View style={s.viewer}><TouchableOpacity onPress={closePreview} style={s.close}><Text style={s.buttonText}>✕ {t('close')}</Text></TouchableOpacity>
-        {preview?.type === 'video' ? <Video source={{ uri: preview.uri }} style={s.media} useNativeControls resizeMode={ResizeMode.CONTAIN} />
+        {preview?.type === 'video' ? <PrivateVideo uri={preview.uri} />
           : preview && <Image source={{ uri: preview.uri }} resizeMode="contain" style={s.media} />}
       </View>
-    </Modal>
+    </SecureOverlay>
   </View>;
 }
 

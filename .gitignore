@@ -37,3 +37,5 @@ netlify.toml
 .netlify/
 
 pnpm-lock.yaml
+
+dist-exchange/
