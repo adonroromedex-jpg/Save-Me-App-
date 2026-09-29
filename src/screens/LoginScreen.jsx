@@ -1,6 +1,6 @@
 // src/screens/LoginScreen.jsx
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { requestEmailCode, verifyEmailCode } from '../services/auth';
@@ -45,8 +45,8 @@ export default function LoginScreen({ navigation }) {
         </TouchableOpacity>
 
         <View style={s.logoRow}>
-          <View style={s.shield}>
-            <Text style={{ fontSize: 22, color: '#fff' }}>✓</Text>
+          <View style={s.logoWhiteBackground}>
+            <Image source={require('../../assets/logo_save_me.png')} style={s.logoImage} resizeMode="contain" />
           </View>
           <Text style={s.title}>{t('signIn')}</Text>
         </View>
@@ -90,7 +90,8 @@ const s = StyleSheet.create({
   back: { position: 'absolute', top: 16, left: 24 },
   backText: { color: '#8888AA', fontSize: 14 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 32 },
-  shield: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#1565C0', alignItems: 'center', justifyContent: 'center' },
+  logoWhiteBackground: { width: 52, height: 52, borderRadius: 10, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  logoImage: { width: 48, height: 48 },
   title: { color: '#fff', fontSize: 26, fontWeight: '700' },
   input: { backgroundColor: '#12122A', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 14, color: '#fff', fontSize: 14, marginBottom: 12 },
   forgot: { alignSelf: 'flex-end', marginBottom: 20 },

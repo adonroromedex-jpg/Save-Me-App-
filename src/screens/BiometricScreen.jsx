@@ -1,6 +1,6 @@
 // src/screens/BiometricScreen.jsx
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { authenticate, isBiometricAvailable, getBiometricType } from '../services/biometrics';
 import { useStore } from '../store/useStore';
@@ -31,8 +31,8 @@ export default function BiometricScreen() {
     <SafeAreaView style={s.container}>
       <View style={s.inner}>
         {/* Logo */}
-        <View style={s.shield}>
-          <Text style={s.shieldText}>✓</Text>
+        <View style={s.logoWhiteBackground}>
+          <Image source={require('../../assets/logo_save_me.png')} style={s.logoImage} resizeMode="contain" />
         </View>
         <Text style={s.title}>{t('biometricTitle')}</Text>
         <Text style={s.sub}>{t('biometricSub')}</Text>
@@ -60,8 +60,8 @@ export default function BiometricScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0A0A1A' },
   inner: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  shield: { width: 72, height: 72, borderRadius: 36, borderWidth: 2, borderColor: '#1565C0', backgroundColor: 'rgba(21,101,192,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
-  shieldText: { fontSize: 32, color: '#fff' },
+  logoWhiteBackground: { width: 80, height: 80, borderRadius: 16, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', marginBottom: 20 },
+  logoImage: { width: 74, height: 74 },
   title: { color: '#fff', fontSize: 20, fontWeight: '600', marginBottom: 8 },
   sub: { color: '#8888AA', fontSize: 13, textAlign: 'center', marginBottom: 28 },
   error: { color: '#D32F2F', fontSize: 12, marginBottom: 12 },
