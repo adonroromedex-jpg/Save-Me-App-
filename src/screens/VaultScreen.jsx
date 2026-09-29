@@ -1,98 +1,103 @@
-// ============================================================
-// src/screens/VaultScreen.jsx
-// ============================================================
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, FlatList, TextInput, Alert } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, AppState, FlatList, Image, Modal, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Video, ResizeMode } from 'expo-av';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { encryptData } from '../services/encryption';
+import { deleteVaultFile, importVaultFile, listVaultFiles, openVaultFile, removePickerCopy, removeVaultPreview } from '../services/vault';
 
-export function VaultScreen() {
+export default function VaultScreen() {
   const { t } = useTranslation();
-  const { files, addFile, removeFile } = useStore();
+  const userId = useStore(s => s.user?.id);
+  const setFiles = useStore(s => s.setFiles);
+  const [files, updateFiles] = useState([]);
   const [search, setSearch] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState(null);
 
-  const filtered = files.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    if (userId) listVaultFiles(userId).then(items => { if (active) { updateFiles(items); setFiles(items); } })
+      .catch(e => Alert.alert(t('vault'), e.message));
+    return () => { active = false; };
+  }, [userId, t, setFiles]));
 
-  const handleAdd = () => {
-    Alert.alert('Ajoute Fichye', 'Chwazi opsyon', [
-      { text: '📷 Foto/Videyo', onPress: pickMedia },
-      { text: '❌ Anile', style: 'cancel' },
-    ]);
-  };
+  const closePreview = useCallback(() => {
+    setPreview(current => { if (current) removeVaultPreview(current.uri).catch(() => {}); return null; });
+  }, []);
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', state => { if (state !== 'active') closePreview(); });
+    return () => { subscription.remove(); closePreview(); };
+  }, [closePreview]);
 
   const pickMedia = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') { Alert.alert('Pèmisyon refize'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, quality: 0.8 });
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      const { encrypted, iv } = await encryptData(asset.uri);
-      addFile({
-        id: Date.now().toString(),
-        name: asset.fileName || `fichye_${Date.now()}.jpg`,
-        type: asset.type === 'video' ? 'video' : 'image',
-        size: `${((asset.fileSize || 0) / 1024 / 1024).toFixed(1)} MB`,
-        encryptedUri: encrypted,
-        iv,
-        createdAt: new Date().toISOString(),
-      });
+    if (busy) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) { Alert.alert(t('vault'), t('galleryPermission')); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, quality: 1 });
+    if (result.canceled || !result.assets?.[0]) return;
+    const asset = result.assets[0];
+    setBusy(true);
+    try {
+      if (useStore.getState().isLocked) throw new Error(t('unlockBeforeImport'));
+      const next = await importVaultFile(userId, asset); updateFiles(next); setFiles(next);
     }
+    catch (e) { Alert.alert(t('vault'), e.message); }
+    finally { await removePickerCopy(asset).catch(() => {}); setBusy(false); }
   };
 
-  const handleDelete = (id, name) => {
-    Alert.alert('Efase Fichye', `Efase "${name}"?`, [
-      { text: 'Efase', style: 'destructive', onPress: () => removeFile(id) },
-      { text: 'Anile', style: 'cancel' },
-    ]);
+  const showFile = async item => {
+    setBusy(true);
+    try { setPreview({ uri: await openVaultFile(userId, item), type: item.type }); }
+    catch (e) { Alert.alert(t('vault'), e.message); }
+    finally { setBusy(false); }
   };
 
-  return (
-    <SafeAreaView style={vs.container}>
-      <View style={vs.header}>
-        <Text style={vs.title}>🔐 {t('vault')}</Text>
-        <TouchableOpacity style={vs.addBtn} onPress={handleAdd}>
-          <Text style={vs.addText}>+ {t('addFile')}</Text>
-        </TouchableOpacity>
+  const confirmDelete = item => Alert.alert(t('deleteFile'), t('deleteFileQuestion'), [
+    { text: t('cancel'), style: 'cancel' },
+    { text: t('deleteFile'), style: 'destructive', onPress: async () => {
+      try { const next = await deleteVaultFile(userId, item); updateFiles(next); setFiles(next); }
+      catch (e) { Alert.alert(t('vault'), e.message); }
+    } },
+  ]);
+
+  const visible = files.filter(f => `${f.type} ${f.createdAt}`.toLowerCase().includes(search.toLowerCase()));
+  return <View style={s.container}>
+    <View style={s.header}><Text style={s.title}>🔐 {t('vault')}</Text>
+      <TouchableOpacity onPress={pickMedia} disabled={busy} style={s.button}><Text style={s.buttonText}>+ {t('addFile')}</Text></TouchableOpacity>
+    </View>
+    <Text style={s.hint}>{t('vaultImportHint')}</Text>
+    <TextInput style={s.input} placeholder={t('searchFiles')} placeholderTextColor="#888" value={search} onChangeText={setSearch} />
+    {busy && <ActivityIndicator color="#D32F2F" />}
+    <FlatList data={visible} keyExtractor={item => item.id} numColumns={2} contentContainerStyle={s.grid}
+      ListEmptyComponent={<Text style={s.empty}>{t('vaultEmpty')}</Text>}
+      renderItem={({ item }) => <TouchableOpacity style={s.card} onPress={() => showFile(item)} onLongPress={() => confirmDelete(item)}>
+        <Text style={s.icon}>{item.type === 'video' ? '🎬' : '🖼️'}</Text>
+        <Text style={s.name}>{item.type === 'video' ? t('video') : t('photo')} · {new Date(item.createdAt).toLocaleDateString()}</Text>
+        <Text style={s.meta}>{(item.size / 1048576).toFixed(1)} MB · AES-256-GCM</Text>
+      </TouchableOpacity>}
+    />
+    <Modal visible={!!preview} onRequestClose={closePreview} animationType="fade">
+      <View style={s.viewer}><TouchableOpacity onPress={closePreview} style={s.close}><Text style={s.buttonText}>✕ {t('close')}</Text></TouchableOpacity>
+        {preview?.type === 'video' ? <Video source={{ uri: preview.uri }} style={s.media} useNativeControls resizeMode={ResizeMode.CONTAIN} />
+          : preview && <Image source={{ uri: preview.uri }} resizeMode="contain" style={s.media} />}
       </View>
-      <TextInput style={vs.search} placeholder={t('searchFiles')} placeholderTextColor="#555" value={search} onChangeText={setSearch} />
-      <FlatList
-        data={filtered}
-        numColumns={2}
-        keyExtractor={i => i.id}
-        contentContainerStyle={vs.grid}
-        columnWrapperStyle={vs.row}
-        ListEmptyComponent={<Text style={vs.empty}>Vault vid. Ajoute premye fichye ou!</Text>}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={vs.item} onLongPress={() => handleDelete(item.id, item.name)}>
-            <Text style={vs.itemIcon}>{item.type === 'image' ? '🖼️' : item.type === 'video' ? '🎥' : item.type === 'audio' ? '🎵' : '📄'}</Text>
-            <Text style={vs.itemName} numberOfLines={1}>{item.name}</Text>
-            <Text style={vs.itemSize}>{item.size}</Text>
-            <View style={vs.itemTag}><Text style={vs.itemTagText}>🔒 {t('encrypted')}</Text></View>
-          </TouchableOpacity>
-        )}
-      />
-    </SafeAreaView>
-  );
+    </Modal>
+  </View>;
 }
 
-const vs = StyleSheet.create({
+const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0A0A1A', padding: 16 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  title: { color: '#fff', fontSize: 18, fontWeight: '600' },
-  addBtn: { backgroundColor: '#D32F2F', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },
-  addText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  search: { backgroundColor: '#12122A', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: 10, color: '#fff', fontSize: 13, marginBottom: 14 },
-  grid: { paddingBottom: 20 },
-  row: { justifyContent: 'space-between', marginBottom: 10 },
-  item: { width: '48%', backgroundColor: '#12122A', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: 12, alignItems: 'center' },
-  itemIcon: { fontSize: 30, marginBottom: 6 },
-  itemName: { color: '#DDD', fontSize: 11, fontWeight: '500', textAlign: 'center' },
-  itemSize: { color: '#555', fontSize: 10, marginTop: 2 },
-  itemTag: { backgroundColor: 'rgba(211,47,47,0.15)', borderRadius: 6, paddingHorizontal: 7, paddingVertical: 2, marginTop: 5 },
-  itemTagText: { color: '#FF7777', fontSize: 9 },
-  empty: { color: '#555', textAlign: 'center', marginTop: 40, fontSize: 13 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  title: { color: '#fff', fontSize: 19, fontWeight: '700' },
+  button: { backgroundColor: '#D32F2F', padding: 10, borderRadius: 10 }, buttonText: { color: '#fff', fontWeight: '700' },
+  hint: { color: '#AAA', fontSize: 12, marginVertical: 12 },
+  input: { color: '#fff', backgroundColor: '#12122A', padding: 12, borderRadius: 10, marginBottom: 10 },
+  grid: { gap: 12, paddingBottom: 30 },
+  card: { width: '48%', marginRight: '2%', backgroundColor: '#12122A', borderRadius: 12, padding: 18, minHeight: 125 },
+  icon: { fontSize: 32 }, name: { color: '#fff', fontSize: 13, marginTop: 10 }, meta: { color: '#AAB', fontSize: 10, marginTop: 4 },
+  empty: { color: '#AAA', marginTop: 40, textAlign: 'center' },
+  viewer: { flex: 1, backgroundColor: '#050510', justifyContent: 'center' },
+  close: { position: 'absolute', top: 40, right: 20, zIndex: 2, padding: 14 }, media: { width: '100%', height: '80%' },
 });
-
-export default VaultScreen;

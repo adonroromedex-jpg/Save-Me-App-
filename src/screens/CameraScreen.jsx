@@ -4,23 +4,28 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { encryptData } from '../services/encryption';
+import { importVaultFile, removePickerCopy } from '../services/vault';
 
 export function CameraScreen() {
+  const { t } = useTranslation();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState('back');
+  const [mode, setMode] = useState('picture');
   const [capturing, setCapturing] = useState(false);
+  const [recording, setRecording] = useState(false);
   const cameraRef = useRef(null);
-  const addFile = useStore(s => s.addFile);
+  const userId = useStore(s => s.user?.id);
+  const setFiles = useStore(s => s.setFiles);
 
-  if (!permission) return <View style={cs.container}><Text style={cs.msg}>Chajman...</Text></View>;
+  if (!permission) return <View style={cs.container}><Text style={cs.msg}>{t('sending')}</Text></View>;
   if (!permission.granted) {
     return (
       <SafeAreaView style={cs.container}>
-        <Text style={cs.msg}>📷 Nou bezwen aksè kamera ou</Text>
+        <Text style={cs.msg}>📷 {t('cameraPermission')}</Text>
         <TouchableOpacity style={cs.permBtn} onPress={requestPermission}>
-          <Text style={cs.permBtnText}>Otorize Kamera</Text>
+          <Text style={cs.permBtnText}>{t('allowCamera')}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -31,36 +36,48 @@ export function CameraScreen() {
     setCapturing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8, base64: false });
-      const { encrypted, iv } = await encryptData(photo.uri);
-      addFile({
-        id: Date.now().toString(),
-        name: `photo_${Date.now()}.jpg`,
-        type: 'image',
-        size: '~2 MB',
-        encryptedUri: encrypted,
-        iv,
-        createdAt: new Date().toISOString(),
-      });
-      Alert.alert('✓ Foto Sekirize', 'Foto ou chifre epi sove nan Vault la. Li pa nan galri telefòn ou.');
+      try {
+        const next = await importVaultFile(userId, { ...photo, type: 'image', mimeType: 'image/jpeg' });
+        setFiles(next);
+        Alert.alert(t('camera'), t('savedToVault'));
+      } finally { await removePickerCopy(photo).catch(() => {}); }
     } catch (e) {
-      Alert.alert('Erè', 'Foto pa ka pran');
+      Alert.alert(t('camera'), e.message);
     }
     setCapturing(false);
   };
 
+  const toggleRecording = async () => {
+    if (recording) { cameraRef.current?.stopRecording(); return; }
+    if (!cameraRef.current || capturing) return;
+    setRecording(true);
+    try {
+      const video = await cameraRef.current.recordAsync({ maxDuration: 30 });
+      if (video?.uri) {
+        try {
+          setFiles(await importVaultFile(userId, { ...video, type: 'video', mimeType: 'video/mp4' }));
+          Alert.alert(t('camera'), t('savedToVault'));
+        } finally { await removePickerCopy(video).catch(() => {}); }
+      }
+    } catch (e) { Alert.alert(t('camera'), e.message); }
+    finally { setRecording(false); }
+  };
+
   return (
     <View style={cs.container}>
-      <CameraView style={cs.camera} facing={facing} ref={cameraRef}>
+      <CameraView style={cs.camera} facing={facing} mode={mode} mute ref={cameraRef}>
         <View style={cs.overlay}>
-          <View style={cs.badge}><Text style={cs.badgeText}>🔒 Kamera Sekirize · Pa galri · Pa cloud</Text></View>
+          <View style={cs.badge}><Text style={cs.badgeText}>🔒 {t('cameraPrivate')}</Text></View>
           <View style={cs.controls}>
-            <TouchableOpacity style={cs.flipBtn} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
+            <TouchableOpacity style={cs.flipBtn} disabled={recording} onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}>
               <Text style={{ fontSize: 24 }}>🔄</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={cs.captureBtn} onPress={takePicture} disabled={capturing}>
+            <TouchableOpacity style={cs.captureBtn} onPress={mode === 'video' ? toggleRecording : takePicture} disabled={capturing}>
               <View style={cs.captureInner} />
             </TouchableOpacity>
-            <View style={{ width: 50 }} />
+            <TouchableOpacity disabled={recording || capturing} onPress={() => setMode(current => current === 'picture' ? 'video' : 'picture')}>
+              <Text style={cs.badgeText}>{mode === 'picture' ? t('video') : t('photo')}{recording ? ' ●' : ''}</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </CameraView>

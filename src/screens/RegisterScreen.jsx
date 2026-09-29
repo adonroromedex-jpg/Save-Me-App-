@@ -4,6 +4,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Scro
 import { useTranslation } from 'react-i18next';
 import { requestEmailCode, verifyEmailCode } from '../services/auth';
 import { useStore } from '../store/useStore';
+import { updateProfile } from '../services/messages';
 
 export default function RegisterScreen({ navigation }) {
   const { t } = useTranslation();
@@ -51,7 +52,14 @@ export default function RegisterScreen({ navigation }) {
 
   const handleVerifyOTP = async () => {
     try {
-      setUser(await verifyEmailCode(form.email, otp));
+      const verified = await verifyEmailCode(form.email, otp);
+      const number = `${form.countryCode.trim().replace(/[\s()-]/g, '')}${form.phone.trim().replace(/[\s()-]/g, '')}`;
+      try {
+        await updateProfile({ firstName: form.firstName, name: form.name, phoneNumber: number });
+      } catch (profileError) {
+        Alert.alert(t('profile'), profileError.message);
+      }
+      setUser({ ...verified, firstName: form.firstName.trim(), name: form.name.trim(), phoneNumber: number });
     } catch (e) {
       Alert.alert(t('verificationFailed'), e.message);
     }

@@ -2,11 +2,12 @@
 // src/screens/SettingsScreen.jsx
 // ============================================================
 import React, { useState } from 'react';
-import { View, Text, Switch, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { changeAppLanguage } from '../i18n/language';
 import { signOutAccount } from '../services/auth';
+import { updateProfile } from '../services/messages';
 
 const LANGS = [
   { code: 'fr', label: '🇫🇷 Français' },
@@ -17,25 +18,38 @@ const LANGS = [
 
 export function SettingsScreen({ navigation }) {
   const { t } = useTranslation();
-  const { user, language, biometricEnabled, logout } = useStore();
-  const [biometric, setBiometric] = useState(biometricEnabled);
+  const { user, language, logout, setUser } = useStore();
+  const [edit, setEdit] = useState(false);
+  const [form, setForm] = useState({ firstName: user?.firstName || '', name: user?.name || '', phoneNumber: user?.phoneNumber || '' });
+  const [saving, setSaving] = useState(false);
+
+  const saveProfile = async () => {
+    setSaving(true);
+    try {
+      const updated = await updateProfile(form);
+      setUser({ ...user, firstName: updated.user_metadata.firstName, name: updated.user_metadata.name,
+        phoneNumber: updated.user_metadata.phoneNumber });
+      setEdit(false);
+    } catch (e) { Alert.alert(t('profile'), e.message); }
+    finally { setSaving(false); }
+  };
 
   const handleLogout = () => {
-    Alert.alert('Dekonekte', 'Ou vle dekonekte?', [
-      { text: 'Wi, dekonekte', style: 'destructive', onPress: async () => {
+    Alert.alert(t('logout'), t('logoutQuestion'), [
+      { text: t('logout'), style: 'destructive', onPress: async () => {
         try {
           await signOutAccount();
           logout();
         } catch (e) {
-          Alert.alert('Dekoneksyon echwe', e.message);
+          Alert.alert(t('logout'), e.message);
         }
       } },
-      { text: 'Non', style: 'cancel' },
+      { text: t('cancel'), style: 'cancel' },
     ]);
   };
 
   const handleLangChange = (code) => {
-    changeAppLanguage(code).catch(() => Alert.alert('Lang', 'Chwa lang lan pa ka sove.'));
+    changeAppLanguage(code).catch(() => Alert.alert(t('language'), t('languageSaveFailed')));
   };
 
   return (
@@ -53,6 +67,14 @@ export function SettingsScreen({ navigation }) {
               <Text style={ss.profileEmail}>{user?.email || ''}</Text>
             </View>
           </View>
+          <Text style={ss.profileEmail}>{user?.phoneNumber || t('phoneMissing')}</Text>
+          {edit ? <View style={{ padding: 14 }}>
+            {['firstName', 'name', 'phoneNumber'].map(key => <TextInput key={key} style={ss.input}
+              placeholder={t(key === 'phoneNumber' ? 'phoneFull' : key)} placeholderTextColor="#999"
+              keyboardType={key === 'phoneNumber' ? 'phone-pad' : 'default'}
+              value={form[key]} onChangeText={value => setForm(previous => ({ ...previous, [key]: value }))} />)}
+            <TouchableOpacity style={ss.item} disabled={saving} onPress={saveProfile}><Text style={ss.itemLabel}>{t('saveProfile')}</Text></TouchableOpacity>
+          </View> : <TouchableOpacity style={ss.item} onPress={() => setEdit(true)}><Text style={ss.itemLabel}>{t('editProfile')}</Text></TouchableOpacity>}
         </View>
 
         {/* Language */}
@@ -69,10 +91,7 @@ export function SettingsScreen({ navigation }) {
         {/* Security */}
         <View style={ss.section}>
           <Text style={ss.sectionTitle}>{t('security')}</Text>
-          <View style={ss.item}>
-            <Text style={ss.itemLabel}>👆 {t('biometricAuth')}</Text>
-            <Switch value={biometric} onValueChange={setBiometric} trackColor={{ true: '#D32F2F' }} />
-          </View>
+          <View style={ss.item}><Text style={ss.itemLabel}>👆 {t('biometricAuth')}</Text></View>
           <TouchableOpacity style={ss.item} onPress={() => navigation.navigate('Plans')}>
             <Text style={ss.itemLabel}>💎 {t('plans')}</Text>
             <Text style={ss.arrow}>→</Text>
@@ -106,6 +125,7 @@ const ss = StyleSheet.create({
   profileEmail: { color: '#8888AA', fontSize: 12, marginTop: 2 },
   dangerBtn: { padding: 14, alignItems: 'center' },
   dangerText: { color: '#D32F2F', fontSize: 15, fontWeight: '600' },
+  input: { color: '#fff', backgroundColor: '#22223B', borderRadius: 8, padding: 12, marginBottom: 8 },
 });
 
 export default SettingsScreen;

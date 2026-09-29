@@ -6,9 +6,9 @@ import { useStore } from '../store/useStore';
 
 const ACTIONS = [
   { icon: '🔐', labelKey: 'vault', subKey: 'recentFiles', screen: 'Vault', color: 'rgba(211,47,47,0.15)' },
-  { icon: '📷', labelKey: 'camera', sub: 'Foto prive', screen: 'Camera', color: 'rgba(21,101,192,0.15)' },
-  { icon: '💬', labelKey: 'messages', sub: '3 konvèsasyon', screen: 'Messages', color: 'rgba(76,175,80,0.15)' },
-  { icon: '🚨', labelKey: 'alerts', sub: '0 menas', screen: 'Alerts', color: 'rgba(255,165,0,0.15)' },
+  { icon: '📷', labelKey: 'camera', subKey: 'privatePhoto', screen: 'Camera', color: 'rgba(21,101,192,0.15)' },
+  { icon: '💬', labelKey: 'messages', sub: '', screen: 'Messages', color: 'rgba(76,175,80,0.15)' },
+  { icon: '🚨', labelKey: 'alerts', subKey: 'noAlerts', screen: 'Alerts', color: 'rgba(255,165,0,0.15)' },
 ];
 
 export default function DashboardScreen({ navigation }) {
@@ -23,7 +23,7 @@ export default function DashboardScreen({ navigation }) {
         {/* Header */}
         <View style={s.header}>
           <View>
-            <Text style={s.greeting}>Bonjou 👋</Text>
+            <Text style={s.greeting}>{t('hello')} 👋</Text>
             <Text style={s.name}>{displayName}</Text>
           </View>
           <View style={s.avatar}><Text style={s.avatarText}>{initials}</Text></View>
@@ -31,23 +31,20 @@ export default function DashboardScreen({ navigation }) {
 
         {/* Security card */}
         <View style={s.secCard}>
-          <Text style={s.secLabel}>{t('securityLevel')}</Text>
+          <Text style={s.secLabel}>{t('vault')}</Text>
           <View style={s.secRow}>
             <View style={s.dot} />
-            <Text style={s.secVal}>{t('protected')}</Text>
+            <Text style={s.secVal}>{files.length} {t('recentFiles')}</Text>
           </View>
-          <View style={s.barBg}>
-            <View style={s.barFill} />
-          </View>
-          <Text style={s.barPct}>92% Sekirite</Text>
+          <Text style={s.barPct}>{t('vaultOnlySecurity')}</Text>
         </View>
 
         {/* Plan badge */}
         <TouchableOpacity style={s.planBadge} onPress={() => navigation.navigate('Plans')}>
           <Text style={s.planText}>
-            {plan === 'free' ? '🆓 Plan Gratis — Pase nan Premium' :
-             plan === 'pro' ? '⭐ Plan Pro' :
-             plan === 'premium' ? '💎 Plan Premium' : '🏢 Plan Business'}
+            {plan === 'free' ? `🆓 ${t('free')} — ${t('plans')}` :
+             plan === 'pro' ? `⭐ ${t('pro')}` :
+             plan === 'premium' ? `💎 ${t('premium')}` : `🏢 ${t('business')}`}
           </Text>
           {plan === 'free' && <Text style={s.planArrow}>→</Text>}
         </TouchableOpacity>
@@ -60,7 +57,7 @@ export default function DashboardScreen({ navigation }) {
                 <Text style={{ fontSize: 22 }}>{a.icon}</Text>
               </View>
               <Text style={s.qaLabel}>{t(a.labelKey)}</Text>
-              <Text style={s.qaSub}>{a.sub || (a.labelKey === 'vault' ? `${files.length} fichye` : '')}</Text>
+              <Text style={s.qaSub}>{a.subKey === 'recentFiles' ? `${files.length} ${t('recentFiles')}` : a.subKey ? t(a.subKey) : ''}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -68,14 +65,14 @@ export default function DashboardScreen({ navigation }) {
         {/* Recent files */}
         <Text style={s.sectionTitle}>{t('recentFiles')}</Text>
         {files.length === 0 ? (
-          <Text style={s.emptyText}>Okenn fichye toujou. Ajoute yon premye nan Vault la!</Text>
+          <Text style={s.emptyText}>{t('vaultEmpty')}</Text>
         ) : (
           files.slice(0, 5).map(f => (
             <View key={f.id} style={s.fileRow}>
-              <Text style={s.fileIcon}>{f.type === 'image' ? '🖼️' : f.type === 'audio' ? '🎵' : '📄'}</Text>
+                <Text style={s.fileIcon}>{f.type === 'image' ? '🖼️' : '🎬'}</Text>
               <View style={s.fileInfo}>
-                <Text style={s.fileName}>{f.name}</Text>
-                <Text style={s.fileMeta}>AES-256 · {f.size}</Text>
+                <Text style={s.fileName}>{f.type === 'video' ? t('video') : t('photo')} · {new Date(f.createdAt).toLocaleDateString()}</Text>
+                <Text style={s.fileMeta}>AES-256-GCM · {((f.size || 0) / 1048576).toFixed(1)} MB</Text>
               </View>
               <Text style={s.fileLock}>🔒</Text>
             </View>
@@ -99,8 +96,6 @@ const s = StyleSheet.create({
   secRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4CAF50' },
   secVal: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  barBg: { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 4, height: 4, marginBottom: 4 },
-  barFill: { backgroundColor: '#4CAF50', borderRadius: 4, height: 4, width: '92%' },
   barPct: { color: 'rgba(255,255,255,0.6)', fontSize: 10, textAlign: 'right' },
   planBadge: { backgroundColor: '#12122A', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.08)', borderRadius: 10, padding: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   planText: { color: '#CCC', fontSize: 12 },

@@ -18,7 +18,7 @@ export default function WelcomeScreen({ navigation }) {
 
   const handleLanguage = (code) => {
     setSelected(code);
-    changeAppLanguage(code).catch(() => Alert.alert('Lang', 'Chwa lang lan pa ka sove.'));
+    changeAppLanguage(code).catch(() => Alert.alert(t('language'), t('languageSaveFailed')));
   };
 
   return (

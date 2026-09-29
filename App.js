@@ -3,14 +3,18 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { usePreventScreenCapture } from 'expo-screen-capture';
 import { restoreAppLanguage } from './src/i18n/language';
 import AppNavigator from './src/navigation/AppNavigator';
 import useAutoLock from './src/hooks/useAutoLock';
 import { getSupabaseClient } from './src/services/supabase';
 import { publicUser } from './src/services/auth';
+import { syncProfile } from './src/services/messages';
+import { clearVaultPreviews } from './src/services/vault';
 import { useStore } from './src/store/useStore';
 
 export default function App() {
+  usePreventScreenCapture();
   useAutoLock();
   const [ready, setReady] = useState(false);
   const [languageReady, setLanguageReady] = useState(false);
@@ -18,6 +22,7 @@ export default function App() {
 
   useEffect(() => {
     restoreAppLanguage().catch(() => {}).finally(() => setLanguageReady(true));
+    clearVaultPreviews().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -34,7 +39,10 @@ export default function App() {
           const { data: { user }, error } = await client.auth.getUser();
           if (!active) return;
           if (error || !user) useStore.getState().logout();
-          else useStore.getState().setUser(publicUser(user));
+          else {
+            if (!useStore.getState().isAuthenticated) useStore.getState().restoreUser(publicUser(user));
+            syncProfile(user).catch(error => console.warn('Profile sync:', error.message));
+          }
         }
         setReady(true);
       };

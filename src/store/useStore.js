@@ -20,16 +20,13 @@ export const useStore = create((set) => ({
   alerts: [],
 
   // Actions
-  setUser: (user) => set((state) => ({
-    user, isAuthenticated: true,
-    isLocked: state.isAuthenticated ? state.isLocked : false,
-  })),
-  logout: () => set({ user: null, isAuthenticated: false, isLocked: true }),
+  setUser: (user) => set({ user, isAuthenticated: true, isLocked: false }),
+  restoreUser: (user) => set({ user, isAuthenticated: true, isLocked: true }),
+  logout: () => set({ user: null, isAuthenticated: false, isLocked: true, files: [], plan: 'free' }),
   lockApp: () => set({ isLocked: true }),
   unlockApp: () => set({ isLocked: false }),
   setLanguage: (language) => set({ language }),
   setPlan: (plan) => set({ plan }),
-  addFile: (file) => set((state) => ({ files: [...state.files, file] })),
-  removeFile: (id) => set((state) => ({ files: state.files.filter(f => f.id !== id) })),
+  setFiles: (files) => set({ files }),
   addAlert: (alert) => set((state) => ({ alerts: [alert, ...state.alerts] })),
 }));

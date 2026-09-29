@@ -1,21 +1,11 @@
-# Security Policy
+# Security status
 
-## Supported Versions
+This project is in development and has not received an independent security audit. Do not use it for sensitive content yet.
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+The vault encrypts imported file bytes locally with AES-256-GCM and keeps the key in the device's SecureStore. Metadata remains in app-private AsyncStorage. Chat uses Supabase RLS and private Storage but does not provide end-to-end encryption. Android screen capture blocking does not stop another device from filming the screen; iOS screenshots cannot be reliably blocked.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+The 24-hour rule is enforced by server-side RLS access checks. Permanent deletion of object bytes also requires the scheduled cleanup Edge Function described in README. A signed URL created just before expiry can work for its remaining short lifetime. Device compromise, rooted devices, external cameras, backups and cached previews require dedicated threat-model review.
 
-## Reporting a Vulnerability
+Phone ownership is not verified because SMS verification was removed. Exact-number discovery has a per-account daily lookup limit, but a matched number is not proof of a person's identity.
 
-Use this section to tell people how to report a vulnerability.
-
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Report suspected vulnerabilities privately to the project owner. Do not publish account tokens, private files or service-role keys in an issue.

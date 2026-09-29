@@ -7,22 +7,19 @@ import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 
 const PLANS = [
-  { id: 'free', icon: '🆓', nameKey: 'free', price: '$0', period: '', features: ['Fonksyon debaz', 'Itilizasyon san limit', 'Reklam aprè aksyon'], color: '#555' },
-  { id: 'pro', icon: '⭐', nameKey: 'pro', price: '$5', periodKey: 'perWeek', features: ['San reklam', 'Pataj foto'], color: '#FF9800' },
-  { id: 'premium', icon: '💎', nameKey: 'premium', price: '$16', periodKey: 'perMonth', features: ['Foto + Videyo', 'Sekirite ranfòse', 'Fonksyon avanse'], color: '#1565C0', featured: true },
-  { id: 'business', icon: '🏢', nameKey: 'business', price: '$55', periodKey: 'perYear', features: ['Aksè konplè', 'Foto + Videyo + Mesaj + Vwa', 'Jesyon avanse'], color: '#9C27B0' },
+  { id: 'free', icon: '🆓', nameKey: 'free', price: '$0', features: ['vault', 'camera', 'messages'], color: '#555' },
+  { id: 'pro', icon: '⭐', nameKey: 'pro', price: '$5', periodKey: 'perWeek', features: ['vault', 'photoSharing'], color: '#FF9800' },
+  { id: 'premium', icon: '💎', nameKey: 'premium', price: '$16', periodKey: 'perMonth', features: ['vault', 'photoVideo'], color: '#1565C0', featured: true },
+  { id: 'business', icon: '🏢', nameKey: 'business', price: '$55', periodKey: 'perYear', features: ['vault', 'photoVideo', 'messages'], color: '#9C27B0' },
 ];
 
 export function PlansScreen({ navigation }) {
   const { t } = useTranslation();
-  const { plan, setPlan } = useStore();
+  const plan = useStore(s => s.plan);
 
   const handleSelect = (id) => {
-    if (id === 'free') { setPlan('free'); navigation?.goBack?.(); return; }
-    Alert.alert('Abonneman', `Pase nan plan ${id}?\n\nIntegrasyon Stripe ap fèt nan backend ou a.`, [
-      { text: 'Chwazi Plan Sa', onPress: () => { setPlan(id); navigation?.goBack?.(); } },
-      { text: 'Anile', style: 'cancel' },
-    ]);
+    if (id === 'free') return;
+    Alert.alert(t('plans'), t('billingUnavailable'));
   };
 
   return (
@@ -30,6 +27,7 @@ export function PlansScreen({ navigation }) {
       <ScrollView contentContainerStyle={ps.scroll}>
         <Text style={ps.title}>{t('plans')}</Text>
         <Text style={ps.sub}>{t('choosePlan')}</Text>
+        <Text style={ps.sub}>{t('planPreview')}</Text>
         {PLANS.map(p => (
           <TouchableOpacity key={p.id} style={[ps.card, p.featured && ps.cardFeatured, plan === p.id && ps.cardActive]} onPress={() => handleSelect(p.id)}>
             {p.featured && <View style={ps.badge}><Text style={ps.badgeText}>⭐ {t('mostPopular')}</Text></View>}
@@ -41,9 +39,9 @@ export function PlansScreen({ navigation }) {
               </View>
             </View>
             {p.features.map(f => (
-              <Text key={f} style={ps.feat}>✓ {f}</Text>
+              <Text key={f} style={ps.feat}>✓ {t(f)}</Text>
             ))}
-            {plan === p.id && <Text style={ps.current}>✅ Plan aktyèl ou</Text>}
+            {plan === p.id && <Text style={ps.current}>✅ {t('currentPlan')}</Text>}
           </TouchableOpacity>
         ))}
       </ScrollView>

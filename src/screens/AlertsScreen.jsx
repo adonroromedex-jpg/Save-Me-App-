@@ -4,28 +4,22 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, FlatList } from 'react-native';
 import { useStore } from '../store/useStore';
-
-const DEMO_ALERTS = [
-  { id: '1', type: 'success', title: 'Koneksyon siksè', detail: 'iPhone 14 · Jodi a 9:41 AM', icon: '✅' },
-  { id: '2', type: 'warning', title: 'Nouvo aparèy detekte', detail: 'Samsung Galaxy · Yè 11:20 PM · Verifye ✓', icon: '⚠️' },
-  { id: '3', type: 'success', title: 'Egzanp alèt', detail: 'Lendi 8:00 AM', icon: '🔐' },
-  { id: '4', type: 'danger', title: 'Tantativ aksè refize', detail: 'Aparèy enkoni · Samdi 3:15 AM · Bloke ✓', icon: '🚫' },
-  { id: '5', type: 'success', title: 'Backup chifre fèt', detail: 'Jedi 2:00 PM', icon: '💾' },
-];
+import { useTranslation } from 'react-i18next';
 
 const COLOR = { success: '#4CAF50', warning: '#FF9800', danger: '#D32F2F' };
 
 export function AlertsScreen() {
+  const { t } = useTranslation();
   const storeAlerts = useStore(s => s.alerts);
-  const all = [...storeAlerts, ...DEMO_ALERTS];
 
   return (
     <SafeAreaView style={as.container}>
-      <Text style={as.title}>🚨 Alèt Sekirite</Text>
+      <Text style={as.title}>🚨 {t('alerts')}</Text>
       <FlatList
-        data={all}
+        data={storeAlerts}
         keyExtractor={i => i.id}
         contentContainerStyle={{ padding: 16, gap: 10 }}
+        ListEmptyComponent={<Text style={as.itemDetail}>{t('noAlerts')}</Text>}
         renderItem={({ item }) => (
           <View style={as.item}>
             <View style={[as.dot, { backgroundColor: COLOR[item.type] || '#666' }]} />
