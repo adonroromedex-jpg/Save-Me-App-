@@ -9,6 +9,7 @@ i18n
     resources,
     lng: 'fr',
     fallbackLng: 'en',
+    compatibilityJSON: 'v3',
     interpolation: { escapeValue: false },
   });
 
