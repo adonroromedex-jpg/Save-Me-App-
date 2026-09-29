@@ -64,6 +64,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView style={{ flex: 1, backgroundColor: '#0A0A1A' }} edges={['top']}>
+        <View style={{ backgroundColor: '#FFE600', paddingVertical: 3, alignItems: 'center' }}>
+          <Text style={{ color: '#111111', fontSize: 12, fontWeight: '700' }}>SAVE ME • TEST 29/09</Text>
+        </View>
         <NavigationContainer>
           <StatusBar style="light" />
           <AppNavigator />
