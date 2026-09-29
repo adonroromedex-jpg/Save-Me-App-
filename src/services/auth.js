@@ -6,6 +6,8 @@ export function publicUser(user) {
     email: user.email,
     firstName: user.user_metadata?.firstName || '',
     name: user.user_metadata?.name || '',
+    countryCode: user.user_metadata?.countryCode || '',
+    phoneNumber: user.user_metadata?.phoneNumber || '',
   };
 }
 

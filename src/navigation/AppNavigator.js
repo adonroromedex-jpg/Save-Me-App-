@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 
 import SplashScreen from '../screens/SplashScreen';
@@ -30,6 +31,7 @@ function TabIcon({ name, focused }) {
 }
 
 function MainTabs() {
+  const { t } = useTranslation();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -46,12 +48,12 @@ function MainTabs() {
         tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
       })}
     >
-      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: 'Akèy' }} />
-      <Tab.Screen name="Vault" component={VaultScreen} options={{ tabBarLabel: 'Vault' }} />
-      <Tab.Screen name="Camera" component={CameraScreen} options={{ tabBarLabel: 'Kamera' }} />
-      <Tab.Screen name="Messages" component={MessagesScreen} options={{ tabBarLabel: 'Mesaj' }} />
-      <Tab.Screen name="Alerts" component={AlertsScreen} options={{ tabBarLabel: 'Alèt' }} />
-      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: 'Paran' }} />
+      <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: t('home') }} />
+      <Tab.Screen name="Vault" component={VaultScreen} options={{ tabBarLabel: t('vault') }} />
+      <Tab.Screen name="Camera" component={CameraScreen} options={{ tabBarLabel: t('camera') }} />
+      <Tab.Screen name="Messages" component={MessagesScreen} options={{ tabBarLabel: t('messages') }} />
+      <Tab.Screen name="Alerts" component={AlertsScreen} options={{ tabBarLabel: t('alerts') }} />
+      <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t('settings') }} />
     </Tab.Navigator>
   );
 }

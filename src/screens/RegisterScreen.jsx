@@ -9,25 +9,41 @@ export default function RegisterScreen({ navigation }) {
   const { t } = useTranslation();
   const setUser = useStore(s => s.setUser);
 
-  const [form, setForm] = useState({ name: '', firstName: '', email: '' });
+  const [form, setForm] = useState({ name: '', firstName: '', countryCode: '', phone: '', email: '' });
   const [step, setStep] = useState(1); // 1=form, 2=verify OTP
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSendOTP = async () => {
-    if (!form.name.trim() || !form.firstName.trim() || !form.email.trim()) {
-      Alert.alert('Erè', 'Tanpri ranpli tout chan obligatwa yo');
+    if (!form.name.trim() || !form.firstName.trim() || !form.countryCode.trim() || !form.phone.trim() || !form.email.trim()) {
+      Alert.alert(t('registrationFailed'), t('requiredFields'));
+      return;
+    }
+    const countryCode = form.countryCode.trim().replace(/[\s()-]/g, '');
+    const nationalNumber = form.phone.trim().replace(/[\s()-]/g, '');
+    const phoneNumber = `${countryCode}${nationalNumber}`;
+    if (!/^\+[1-9]\d{0,2}$/.test(countryCode) || !/^\d{4,14}$/.test(nationalNumber) || !/^\+[1-9]\d{6,14}$/.test(phoneNumber)) {
+      Alert.alert(t('registrationFailed'), t('invalidPhone'));
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      Alert.alert(t('registrationFailed'), t('invalidEmail'));
       return;
     }
     setLoading(true);
     try {
       await requestEmailCode(form.email, {
         createUser: true,
-        profile: { firstName: form.firstName.trim(), name: form.name.trim() },
+        profile: {
+          firstName: form.firstName.trim(),
+          name: form.name.trim(),
+          countryCode,
+          phoneNumber,
+        },
       });
       setStep(2);
     } catch (e) {
-      Alert.alert('Enskripsyon pa fini', e.message);
+      Alert.alert(t('registrationFailed'), e.message);
     } finally {
       setLoading(false);
     }
@@ -37,7 +53,7 @@ export default function RegisterScreen({ navigation }) {
     try {
       setUser(await verifyEmailCode(form.email, otp));
     } catch (e) {
-      Alert.alert('Verifikasyon echwe', e.message);
+      Alert.alert(t('verificationFailed'), e.message);
     }
   };
 
@@ -45,16 +61,18 @@ export default function RegisterScreen({ navigation }) {
     <SafeAreaView style={s.container}>
       <ScrollView contentContainerStyle={s.scroll} keyboardShouldPersistTaps="handled">
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
-          <Text style={s.backText}>← Retounen</Text>
+          <Text style={s.backText}>{t('back')}</Text>
         </TouchableOpacity>
 
-        <Text style={s.title}>{step === 1 ? t('createAccount') : 'Verifye Kòd la'}</Text>
+        <Text style={s.title}>{step === 1 ? t('createAccount') : t('verifyCodeTitle')}</Text>
 
         {step === 1 ? (
           <>
             {[
               { key: 'firstName', placeholder: t('firstName') },
               { key: 'name', placeholder: t('name') },
+              { key: 'countryCode', placeholder: t('countryCode'), keyboardType: 'phone-pad' },
+              { key: 'phone', placeholder: t('phoneRequired'), keyboardType: 'phone-pad' },
               { key: 'email', placeholder: t('email'), keyboardType: 'email-address' },
             ].map(field => (
               <TextInput
@@ -66,24 +84,25 @@ export default function RegisterScreen({ navigation }) {
                 onChangeText={v => setForm(f => ({ ...f, [field.key]: v }))}
                 keyboardType={field.keyboardType || 'default'}
                 secureTextEntry={field.secureTextEntry}
-                autoCapitalize="none"
+                autoCapitalize={field.key === 'firstName' || field.key === 'name' ? 'words' : 'none'}
+                autoComplete={field.key === 'email' ? 'email' : field.key === 'phone' ? 'tel' : undefined}
               />
             ))}
 
-            <Text style={s.label2FA}>N ap voye yon kòd konfimasyon nan imèl ou.</Text>
+            <Text style={s.label2FA}>{t('emailCodeInfo')}</Text>
 
             <TouchableOpacity style={s.btnPrimary} onPress={handleSendOTP} disabled={loading}>
-              <Text style={s.btnPrimaryText}>{loading ? 'Ap voye...' : 'Kontinye →'}</Text>
+              <Text style={s.btnPrimaryText}>{loading ? t('sending') : t('continue')}</Text>
             </TouchableOpacity>
           </>
         ) : (
           <>
             <Text style={s.otpInfo}>
-              Antre kòd nou voye nan {form.email}
+              {t('codeSentTo', { email: form.email })}
             </Text>
             <TextInput
               style={[s.input, s.otpInput]}
-              placeholder="Kòd imèl"
+              placeholder={t('emailCode')}
               placeholderTextColor="#555"
               value={otp}
               onChangeText={setOtp}

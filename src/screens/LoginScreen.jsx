@@ -15,7 +15,7 @@ export default function LoginScreen({ navigation }) {
 
   const handleLogin = async () => {
     if (!email.trim()) {
-      Alert.alert('Erè', 'Tanpri antre imèl ou');
+      Alert.alert(t('loginFailed'), t('requiredFields'));
       return;
     }
     setLoading(true);
@@ -23,7 +23,7 @@ export default function LoginScreen({ navigation }) {
       await requestEmailCode(email);
       setCodeSent(true);
     } catch (e) {
-      Alert.alert('Koneksyon pa fini', e.message);
+      Alert.alert(t('loginFailed'), e.message);
     } finally {
       setLoading(false);
     }
@@ -33,7 +33,7 @@ export default function LoginScreen({ navigation }) {
     try {
       setUser(await verifyEmailCode(email, otp));
     } catch (e) {
-      Alert.alert('Kòd imèl pa valide', e.message);
+      Alert.alert(t('invalidCode'), e.message);
     }
   };
 
@@ -41,7 +41,7 @@ export default function LoginScreen({ navigation }) {
     <SafeAreaView style={s.container}>
       <View style={s.inner}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={s.back}>
-          <Text style={s.backText}>← Retounen</Text>
+          <Text style={s.backText}>{t('back')}</Text>
         </TouchableOpacity>
 
         <View style={s.logoRow}>
@@ -52,14 +52,14 @@ export default function LoginScreen({ navigation }) {
         </View>
 
         {codeSent ? <>
-          <Text style={s.forgotText}>Antre kòd ou resevwa nan {email}.</Text>
-          <TextInput style={s.input} placeholder="Kòd imèl" placeholderTextColor="#555"
+          <Text style={s.forgotText}>{t('codeSentTo', { email })}</Text>
+          <TextInput style={s.input} placeholder={t('emailCode')} placeholderTextColor="#555"
             keyboardType="number-pad" maxLength={8} value={otp} onChangeText={setOtp} />
           <TouchableOpacity style={s.btnPrimary} onPress={handleVerify}>
-            <Text style={s.btnPrimaryText}>Verifye imèl →</Text>
+            <Text style={s.btnPrimaryText}>{t('verifyEmail')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.registerLink} onPress={() => setCodeSent(false)}>
-            <Text style={s.registerText}>Chanje imèl</Text>
+            <Text style={s.registerText}>{t('changeEmail')}</Text>
           </TouchableOpacity>
         </> : <>
         <TextInput
@@ -72,11 +72,11 @@ export default function LoginScreen({ navigation }) {
           autoCapitalize="none"
         />
         <TouchableOpacity style={s.btnPrimary} onPress={handleLogin} disabled={loading}>
-          <Text style={s.btnPrimaryText}>{loading ? 'Ap voye...' : 'Voye kòd imèl →'}</Text>
+          <Text style={s.btnPrimaryText}>{loading ? t('sending') : t('sendCode')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => navigation.navigate('Register')} style={s.registerLink}>
-          <Text style={s.registerText}>Ou pa gen kont? <Text style={s.registerHighlight}>{t('createAccount')}</Text></Text>
+          <Text style={s.registerText}>{t('noAccount')} <Text style={s.registerHighlight}>{t('createAccount')}</Text></Text>
         </TouchableOpacity>
         </>}
       </View>

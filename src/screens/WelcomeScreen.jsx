@@ -1,8 +1,8 @@
 // src/screens/WelcomeScreen.jsx
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import i18n from '../i18n';
+import { changeAppLanguage } from '../i18n/language';
 import { useStore } from '../store/useStore';
 
 const LANGUAGES = [
@@ -14,13 +14,11 @@ const LANGUAGES = [
 
 export default function WelcomeScreen({ navigation }) {
   const { t } = useTranslation();
-  const setLanguage = useStore(s => s.setLanguage);
-  const [selected, setSelected] = useState('fr');
+  const [selected, setSelected] = useState(useStore.getState().language);
 
   const handleLanguage = (code) => {
     setSelected(code);
-    i18n.changeLanguage(code);
-    setLanguage(code);
+    changeAppLanguage(code).catch(() => Alert.alert('Lang', 'Chwa lang lan pa ka sove.'));
   };
 
   return (

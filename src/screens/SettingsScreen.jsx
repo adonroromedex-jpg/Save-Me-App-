@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import { View, Text, Switch, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import i18n from '../i18n';
+import { changeAppLanguage } from '../i18n/language';
 import { signOutAccount } from '../services/auth';
 
 const LANGS = [
@@ -17,7 +17,7 @@ const LANGS = [
 
 export function SettingsScreen({ navigation }) {
   const { t } = useTranslation();
-  const { user, language, biometricEnabled, logout, setLanguage } = useStore();
+  const { user, language, biometricEnabled, logout } = useStore();
   const [biometric, setBiometric] = useState(biometricEnabled);
 
   const handleLogout = () => {
@@ -35,8 +35,7 @@ export function SettingsScreen({ navigation }) {
   };
 
   const handleLangChange = (code) => {
-    i18n.changeLanguage(code);
-    setLanguage(code);
+    changeAppLanguage(code).catch(() => Alert.alert('Lang', 'Chwa lang lan pa ka sove.'));
   };
 
   return (
@@ -46,7 +45,7 @@ export function SettingsScreen({ navigation }) {
 
         {/* Profile */}
         <View style={ss.section}>
-          <Text style={ss.sectionTitle}>Pwofil</Text>
+          <Text style={ss.sectionTitle}>{t('profile')}</Text>
           <View style={ss.profileRow}>
             <View style={ss.avatar}><Text style={ss.avatarText}>{user ? `${(user.firstName||'U')[0]}${(user.name||'S')[0]}`.toUpperCase() : 'SM'}</Text></View>
             <View>
@@ -58,7 +57,7 @@ export function SettingsScreen({ navigation }) {
 
         {/* Language */}
         <View style={ss.section}>
-          <Text style={ss.sectionTitle}>Lang / Language</Text>
+          <Text style={ss.sectionTitle}>{t('language')}</Text>
           {LANGS.map(l => (
             <TouchableOpacity key={l.code} style={ss.item} onPress={() => handleLangChange(l.code)}>
               <Text style={ss.itemLabel}>{l.label}</Text>
