@@ -63,7 +63,7 @@ export function SettingsScreen({ navigation }) {
           <View style={ss.profileRow}>
             <View style={ss.avatar}><Text style={ss.avatarText}>{user ? `${(user.firstName||'U')[0]}${(user.name||'S')[0]}`.toUpperCase() : 'SM'}</Text></View>
             <View>
-              <Text style={ss.profileName}>{user ? `${user.firstName} ${user.name}` : 'Utilisateur'}</Text>
+              <Text style={ss.profileName}>{user ? `${user.firstName} ${user.name}` : t('profile')}</Text>
               <Text style={ss.profileEmail}>{user?.email || ''}</Text>
             </View>
           </View>

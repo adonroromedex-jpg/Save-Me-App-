@@ -1,5 +1,6 @@
 // src/screens/SplashScreen.jsx
 import React, { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View, Text, StyleSheet, Animated,
   Easing, StatusBar, Dimensions, Image
@@ -8,6 +9,7 @@ import {
 const { width, height } = Dimensions.get('window');
 
 export default function SplashScreen({ onFinish }) {
+  const { t } = useTranslation();
   const imageOpacity = useRef(new Animated.Value(0)).current;
   const imageScale = useRef(new Animated.Value(1.08)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
@@ -18,7 +20,7 @@ export default function SplashScreen({ onFinish }) {
   const cursorOpacity = useRef(new Animated.Value(1)).current;
 
   // Lèt "Please SaveMe" yo
-  const letters = 'Please SaveMe'.split('');
+  const letters = t('splashPhrase').split('');
   const letterAnims = useRef(
     letters.map(() => new Animated.Value(0))
   ).current;
@@ -146,7 +148,7 @@ export default function SplashScreen({ onFinish }) {
             <Animated.Text
               key={i}
               style={[
-                i >= 7 ? s.letterRed : s.letterBlue,
+                i >= Math.floor(letters.length / 2) ? s.letterRed : s.letterBlue,
                 {
                   opacity: letterAnims[i],
                   transform: [{
@@ -166,12 +168,12 @@ export default function SplashScreen({ onFinish }) {
 
         {/* Tagline */}
         <Animated.Text style={[s.tagline, { opacity: subOpacity }]}>
-          Protèje · Pataje · Konekte
+          {t('splashTagline')}
         </Animated.Text>
 
         {/* Sous-tit */}
         <Animated.Text style={[s.subTagline, { opacity: subOpacity }]}>
-          Byenveni nan SaveMe! ♥
+          {t('splashWelcome')} ♥
         </Animated.Text>
       </View>
 

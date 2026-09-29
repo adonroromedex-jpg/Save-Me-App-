@@ -15,7 +15,7 @@ export default function DashboardScreen({ navigation }) {
   const { t } = useTranslation();
   const { user, files, plan } = useStore();
   const initials = user ? `${(user.firstName || 'U')[0]}${(user.name || 'S')[0]}`.toUpperCase() : 'SM';
-  const displayName = user ? `${user.firstName} ${user.name}` : 'Utilisateur';
+  const displayName = user ? `${user.firstName} ${user.name}` : t('profile');
 
   return (
     <SafeAreaView style={s.container}>

@@ -323,6 +323,7 @@ export const resources = {
 };
 
 Object.assign(resources.fr.translation, {
+  splashPhrase: "Save Me", splashTagline: "Protéger · Partager · Se connecter", splashWelcome: "Bienvenue dans Save Me !",
   unlockBeforeImport: "Déverrouillez l'application puis réessayez.",
   hello: "Bonjour", privatePhoto: "Photo privée", logoutQuestion: "Voulez-vous vous déconnecter ?",
   languageSaveFailed: "Impossible d'enregistrer la langue.",
@@ -349,6 +350,7 @@ Object.assign(resources.fr.translation, {
   writeMessage: "Écrire un message...", chatExpiry: "Les messages expirent 24 h après l'envoi. Les médias reçus restent dans ce chat.",
 });
 Object.assign(resources.en.translation, {
+  splashPhrase: "Save Me", splashTagline: "Protect · Share · Connect", splashWelcome: "Welcome to Save Me!",
   unlockBeforeImport: "Unlock the app and try again.",
   hello: "Hello", privatePhoto: "Private photo", logoutQuestion: "Sign out of Save Me?",
   languageSaveFailed: "Could not save language.",
@@ -373,6 +375,7 @@ Object.assign(resources.en.translation, {
   writeMessage: "Write a message...", chatExpiry: "Messages expire 24 hours after sending. Received media stays in this chat.",
 });
 Object.assign(resources.es.translation, {
+  splashPhrase: "Save Me", splashTagline: "Proteger · Compartir · Conectar", splashWelcome: "¡Bienvenido a Save Me!",
   unlockBeforeImport: "Desbloquea la aplicación y vuelve a intentarlo.",
   hello: "Hola", privatePhoto: "Foto privada", logoutQuestion: "¿Quieres cerrar sesión?",
   languageSaveFailed: "No se pudo guardar el idioma.",
@@ -398,6 +401,7 @@ Object.assign(resources.es.translation, {
   writeMessage: "Escribe un mensaje...", chatExpiry: "Los mensajes vencen 24 h después de enviarlos. Los archivos recibidos quedan en este chat.",
 });
 Object.assign(resources.ht.translation, {
+  splashPhrase: "Save Me", splashTagline: "Pwoteje · Pataje · Konekte", splashWelcome: "Byenveni nan Save Me!",
   unlockBeforeImport: "Debloke app la epi eseye ankò.",
   hello: "Bonjou", privatePhoto: "Foto prive", logoutQuestion: "Ou vle dekonekte?",
   languageSaveFailed: "Nou pa ka sove lang lan.",
