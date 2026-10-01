@@ -1,7 +1,9 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { filterPhoneContacts, isPhoneQuery } from '../utils/contactSearch';
 import PrivateVideo from '../components/PrivateVideo';
 import { SecureOverlay } from '../components/SecureOverlay';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, BackHandler, FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
@@ -24,7 +26,7 @@ export default function MessagesScreen({ navigation }) {
   const [menuOpen,setMenuOpen] = useState(false);
   const [peer,setPeer] = useState(null), [mode,setMode] = useState('list');
   const [conversations,setConversations] = useState([]), [messages,setMessages] = useState([]), [contacts,setContacts] = useState([]);
-  const [filter,setFilter] = useState(''), [phone,setPhone] = useState(''), [input,setInput] = useState('');
+  const [contactQuery,setContactQuery] = useState(''), [contactsLoaded,setContactsLoaded] = useState(false), [contactError,setContactError] = useState(''), [input,setInput] = useState('');
   const [busy,setBusy] = useState(false), [error,setError] = useState(''), [progress,setProgress] = useState(null);
   const [preview,setPreview] = useState(null), [recording,setRecording] = useState(false), [voice,setVoice] = useState(null);
   const [seconds,setSeconds] = useState(0), [color,setColor] = useState(colors[0]), [loadingOlder,setLoadingOlder] = useState(false);
@@ -96,12 +98,22 @@ export default function MessagesScreen({ navigation }) {
     listMessages(user.id,person.id).then(rows=>{if(peerRef.current?.id===person.id && alive.current)setMessages(rows);}).catch(e=>setError(e.message));
   };
   const back=()=>{operation.current++;closePreview();discardVoice();abortRecording();peerRef.current=null;setPeer(null);setMode('list');setInput('');refresh();};
+  useFocusEffect(useCallback(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (menuOpen || preview) return false;
+      if (mode === 'list') return false;
+      if (!busy) back();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [mode, busy, menuOpen, preview]));
   const older=async()=>{
     if(loadingOlder || !messages.length)return;setLoadingOlder(true);const target=peer.id;
     try {const rows=await listMessages(user.id,target,messages[messages.length-1].created_at);if(peerRef.current?.id===target)setMessages(current=>[...current,...rows.filter(r=>!current.some(m=>m.id===r.id))]);}
     catch(e){setError(e.message);}finally{setLoadingOlder(false);}
   };
   const browseContacts=async()=>{
+    if (busy) return;
     setMode('contacts');
     const permission=await Contacts.requestPermissionsAsync();
     if(!permission.granted){Alert.alert(t('messages'),t('contactsPermission'));return;}
@@ -109,15 +121,22 @@ export default function MessagesScreen({ navigation }) {
     try {const all=[];let offset=0,more=true;while(more && offset<10000){
       const page=await Contacts.getContactsAsync({fields:[Contacts.Fields.PhoneNumbers],pageSize:500,pageOffset:offset});
       all.push(...page.data.filter(c=>c.phoneNumbers?.length));more=page.hasNextPage && page.data.length>0;offset+=page.data.length;
-    }setContacts(all);}catch(e){Alert.alert(t('messages'),e.message);}finally{setBusy(false);}
+    }setContacts(all);setContactsLoaded(true);}catch(e){Alert.alert(t('messages'),e.message);}finally{setBusy(false);}
   };
   const findPhone=async number=>{
-    setBusy(true);try{
+    if (busy) return;
+    setContactError('');setBusy(true);try{
       const normalized=normalizePhone(number,user?.countryCode||'');
       if(!normalized)throw new Error(t('countryCodeNeeded'));
       if(normalized===normalizePhone(user?.phoneNumber,user?.countryCode||''))throw new Error(t('ownPhoneContact'));
-      const found=await lookupContact(normalized);if(!found)Alert.alert(t('messages'),t('contactNotFound'));else openChat(found);
-    }catch(e){Alert.alert(t('messages'),e.message);}finally{setBusy(false);}
+      const found=await lookupContact(normalized);if(!found)setContactError(t('contactNotFound'));else openChat(found);
+    }catch(e){setContactError(e.message);}finally{setBusy(false);}
+  };
+  const searchContact = async () => {
+    setContactError('');
+    if (!contactQuery.trim()) { setContactError(t('contactSearchRequired')); return; }
+    if (isPhoneQuery(contactQuery)) await findPhone(contactQuery);
+    else if (!contactsLoaded) await browseContacts();
   };
   const submitText=async()=>{
     if(!input.trim() || busy || !peer)return;setBusy(true);
@@ -201,25 +220,37 @@ export default function MessagesScreen({ navigation }) {
     <View style={s.header}>
       {mode!=='list' && <TouchableOpacity disabled={busy} onPress={back}><Text style={s.link}>{t('back')}</Text></TouchableOpacity>}
       <Text numberOfLines={1} style={[s.title,{flexShrink:1}]}>{mode==='chat'?label(peer):mode==='contacts'?t('phoneContacts'):t('messages')}</Text>
-      {mode==='list' && <TouchableOpacity onPress={browseContacts}><Text style={s.link}>＋ {t('newChat')}</Text></TouchableOpacity>}
+      {mode==='list' && <TouchableOpacity onPress={()=>{setContactError('');setMode('contacts');}}><Text style={s.link}>＋ {t('newChat')}</Text></TouchableOpacity>}
       {mode==='chat' && <TouchableOpacity onPress={menu} accessibilityLabel={t('chatMenu')}><Text style={s.link}>•••</Text></TouchableOpacity>}
     </View>
     {!!error && <Text style={s.error}>{error}</Text>}
     {busy && <View style={s.inputRow}><ActivityIndicator color="#82B9FF" />{progress!==null && <Text style={s.sub}>{progress}%</Text>}</View>}
     {mode==='list' && <>
-      <TouchableOpacity onPress={()=>setMode('contacts')} style={s.action}><Text style={s.actionText}>{t('findByPhone')} →</Text></TouchableOpacity>
       <FlatList data={conversations} keyExtractor={r=>r.peer.id} onRefresh={refresh} refreshing={false} ListEmptyComponent={<Text style={s.empty}>{t('noConversations')}</Text>}
         renderItem={({item})=><TouchableOpacity style={s.row} onPress={()=>openChat(item.peer)}><Text style={s.person}>{label(item.peer)}</Text><Text style={s.sub}>🔒 {item.last.media_kind?kindLabel(item.last.media_kind):t('encryptedMessage')}</Text></TouchableOpacity>} />
     </>}
     {mode==='contacts' && <>
-      <Text style={s.hint}>{t('contactPrivacy')}</Text>
-      <TouchableOpacity style={s.action} onPress={browseContacts}><Text style={s.actionText}>{t('phoneContacts')}</Text></TouchableOpacity>
-      <View style={s.inputRow}><TextInput style={s.input} placeholder="+509…" placeholderTextColor="#888" keyboardType="phone-pad" value={phone} onChangeText={setPhone} />
-        <TouchableOpacity style={s.send} onPress={()=>findPhone(phone)} disabled={busy}><Text style={s.sendText}>→</Text></TouchableOpacity></View>
-      <TextInput style={s.search} placeholder={t('searchContacts')} placeholderTextColor="#888" value={filter} onChangeText={setFilter} />
-      <FlatList keyboardShouldPersistTaps="handled" data={contacts.flatMap(c=>(c.phoneNumbers||[]).map((n,i)=>({id:`${c.id}-${i}`,name:c.name,number:n.number}))).filter(c=>`${c.name} ${c.number}`.toLowerCase().includes(filter.toLowerCase()))}
-        keyExtractor={c=>c.id} renderItem={({item})=><TouchableOpacity style={s.row} onPress={()=>findPhone(item.number)}><Text style={s.person}>{item.name}</Text><Text style={s.sub}>{item.number}</Text></TouchableOpacity>} />
+      <View style={s.contactSearch}>
+        <Ionicons name="search-outline" size={20} color="#9CB5D4" />
+        <TextInput style={s.contactInput} placeholder={t('contactSearchPlaceholder')} placeholderTextColor="#899CB7"
+          value={contactQuery} onChangeText={value=>{setContactQuery(value);setContactError('');}}
+          autoCorrect={false} autoCapitalize="none" returnKeyType="search" onSubmitEditing={searchContact}
+          accessibilityLabel={t('contactSearchPlaceholder')} />
+        <TouchableOpacity disabled={busy} onPress={browseContacts} style={s.searchButton} accessibilityLabel={t('phoneContacts')}>
+          <Ionicons name="people-outline" size={23} color="#FFFFFF" />
+        </TouchableOpacity>
+        <TouchableOpacity disabled={busy} onPress={searchContact} style={s.searchButton} accessibilityLabel={t('searchContacts')}>
+          <Ionicons name="arrow-forward" size={22} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+      {!!contactError && <Text accessibilityLiveRegion="polite" style={s.error}>{contactError}</Text>}
+      <FlatList keyboardShouldPersistTaps="handled" data={filterPhoneContacts(contacts,contactQuery)}
+        ListEmptyComponent={<Text style={s.empty}>{t(contactsLoaded?'noMatchingContacts':'contactSearchHint')}</Text>}
+        keyExtractor={contact=>contact.id} renderItem={({item})=><TouchableOpacity disabled={busy} style={s.row} onPress={()=>findPhone(item.number)}>
+          <Text style={s.person}>{item.name}</Text><Text style={s.sub}>{item.number}</Text>
+        </TouchableOpacity>} />
     </>}
+
     {mode==='chat' && <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
       <Text style={s.hint}>{t('chatExpiry')}</Text>
       <FlatList inverted data={messages} keyExtractor={m=>m.id} contentContainerStyle={[s.messages,{justifyContent:'flex-start'}]} keyboardShouldPersistTaps="handled"
@@ -254,12 +285,14 @@ export default function MessagesScreen({ navigation }) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0A0A1A' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16, borderBottomWidth: 1, borderBottomColor: '#25253B' },
-  title: { color: '#fff', fontSize: 18, fontWeight: '700' }, link: { color: '#FF7777', fontSize: 14 },
+  title: { color: '#fff', fontSize: 18, fontWeight: '700' }, link: { color: '#8FBFFF', fontSize: 14 },
   hint: { color: '#9999AA', fontSize: 11, margin: 14, lineHeight: 16 }, error: { color: '#FF7777', margin: 14 },
   action: { margin: 16, padding: 14, borderRadius: 10, backgroundColor: '#22223B' }, actionText: { color: '#fff' },
   row: { padding: 16, borderBottomWidth: 1, borderBottomColor: '#25253B' }, person: { color: '#fff', fontSize: 16 },
   sub: { color: '#9999AA', fontSize: 12, marginTop: 5 }, empty: { color: '#888', textAlign: 'center', margin: 30 },
-  search: { color: '#fff', backgroundColor: '#16162B', marginHorizontal: 14, padding: 12, borderRadius: 10 },
+  contactSearch: { flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: '#111E33', margin: 16, paddingLeft: 12, paddingRight: 4, borderRadius: 16 },
+  contactInput: { flex: 1, color: '#FFFFFF', minWidth: 0, paddingVertical: 16, fontSize: 14 },
+  searchButton: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center' },
   messages: { padding: 16, gap: 8, flexGrow: 1, justifyContent: 'flex-end' },
   bubble: { maxWidth: '80%', padding: 12, borderRadius: 14 }, mine: { alignSelf: 'flex-end', backgroundColor: '#1565C0' },
   theirs: { alignSelf: 'flex-start', backgroundColor: '#22223B' }, message: { color: '#fff', fontSize: 15 },

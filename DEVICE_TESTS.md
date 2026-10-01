@@ -32,3 +32,9 @@ where id = 'REPLACE_WITH_DISPOSABLE_MESSAGE_UUID'
 ```
 
 Repeat wrong-code and RLS checks against the real Supabase project; local database tests use fixtures for pgcrypto. Confirm real Storage upload/download MIME limits, successful Edge Function invocations, and deletion of all chunk objects. The code authoring environment cannot substitute for Gradle/device testing.
+
+## Exchange 1.1 interface checks
+
+- Search with a full formatted number, an invalid number, an accented contact name, and a phone number with spaces. Only one input should appear; the contacts icon requests phone-book access on demand.
+- Confirm five footer tabs, white icons on blue, an active-tab highlight and correct spacing above the Android navigation bar. Home has no vault-count banner, duplicate action grid or Alerts shortcut.
+- In Android Settings on the emulator, configure a device PIN; reopen Save Me and test successful PIN unlock, cancellation and wrong PIN. A device without a configured lock must require email sign-in instead.

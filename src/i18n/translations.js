@@ -1,3 +1,4 @@
+import { uiRefresh } from './uiRefresh';
 import { exchange } from './exchange';
 // src/i18n/translations.js
 export const resources = {
@@ -445,3 +446,5 @@ Object.assign(resources.ht.translation, {
 });
 
 for (const language of Object.keys(exchange)) Object.assign(resources[language].translation, exchange[language]);
+
+for (const language of Object.keys(uiRefresh)) Object.assign(resources[language].translation, uiRefresh[language]);

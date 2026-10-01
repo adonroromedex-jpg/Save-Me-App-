@@ -1,8 +1,10 @@
 // src/navigation/AppNavigator.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Text } from 'react-native';
+import { View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 
@@ -15,7 +17,6 @@ import DashboardScreen from '../screens/DashboardScreen';
 import VaultScreen from '../screens/VaultScreen';
 import CameraScreen from '../screens/CameraScreen';
 import MessagesScreen from '../screens/MessagesScreen';
-import AlertsScreen from '../screens/AlertsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import PlansScreen from '../screens/PlansScreen';
 
@@ -24,35 +25,39 @@ const Tab = createBottomTabNavigator();
 
 function TabIcon({ name, focused }) {
   const icons = {
-    Dashboard: '🏠', Vault: '📁', Camera: '📷',
-    Messages: '💬', Alerts: '🚨', Settings: '⚙️',
+    Dashboard: ['home-outline', 'home'],
+    Vault: ['lock-closed-outline', 'lock-closed'],
+    Camera: ['camera-outline', 'camera'],
+    Messages: ['chatbubbles-outline', 'chatbubbles'],
+    Settings: ['settings-outline', 'settings'],
   };
-  return <Text style={{ fontSize: 20 }}>{icons[name] || '●'}</Text>;
+  return <View style={{ width: 48, height: 34, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: focused ? 'rgba(255,255,255,0.18)' : 'transparent' }}>
+    <Ionicons name={icons[name][focused ? 1 : 0]} size={23} color={focused ? '#FFFFFF' : 'rgba(255,255,255,0.75)'} />
+  </View>;
 }
 
 function MainTabs() {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const bottom = Math.max(insets.bottom, 10);
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        headerShown: false,
-        tabBarStyle: {
-          backgroundColor: '#FDF0F5',
-          borderTopColor: 'rgba(211,47,47,0.1)',
-          paddingBottom: 8,
-          height: 60,
-        },
-        tabBarActiveTintColor: '#D32F2F',
-        tabBarInactiveTintColor: '#AAAAAA',
-        tabBarLabelStyle: { fontSize: 10 },
-        tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
-      })}
-    >
+    <Tab.Navigator screenOptions={({ route }) => ({
+      headerShown: false,
+      tabBarHideOnKeyboard: true,
+      tabBarStyle: {
+        backgroundColor: '#104A91', borderTopWidth: 0,
+        paddingTop: 7, paddingBottom: bottom, height: 64 + bottom,
+        elevation: 0, shadowOpacity: 0,
+      },
+      tabBarActiveTintColor: '#FFFFFF',
+      tabBarInactiveTintColor: 'rgba(255,255,255,0.75)',
+      tabBarLabelStyle: { fontSize: 10, fontWeight: '600', marginBottom: 3 },
+      tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} />,
+    })}>
       <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: t('home') }} />
       <Tab.Screen name="Vault" component={VaultScreen} options={{ tabBarLabel: t('vault') }} />
       <Tab.Screen name="Camera" component={CameraScreen} options={{ tabBarLabel: t('camera') }} />
       <Tab.Screen name="Messages" component={MessagesScreen} options={{ tabBarLabel: t('messages') }} />
-      <Tab.Screen name="Alerts" component={AlertsScreen} options={{ tabBarLabel: t('alerts') }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t('settings') }} />
     </Tab.Navigator>
   );
@@ -62,7 +67,7 @@ export default function AppNavigator() {
   const { isAuthenticated, isLocked } = useStore();
   const [showLockSplash, setShowLockSplash] = useState(true);
 
-  // Splash screen anvan re-login apre auto-lock
+  // Play the existing splash once on launch.
   if (showLockSplash) {
     return (
       <SplashScreen onFinish={() => setShowLockSplash(false)} />

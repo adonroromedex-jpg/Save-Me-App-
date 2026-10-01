@@ -1,8 +1,8 @@
 // src/screens/BiometricScreen.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { authenticate, isBiometricAvailable, getBiometricType } from '../services/biometrics';
+import { authenticate, getBiometricType } from '../services/biometrics';
 import { useStore } from '../store/useStore';
 import { signOutAccount } from '../services/auth';
 
@@ -12,19 +12,37 @@ export default function BiometricScreen() {
   const logout = useStore(s => s.logout);
   const [bioType, setBioType] = useState('none');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const active = useRef(true);
 
   useEffect(() => {
+    active.current = true;
     (async () => {
-      const type = await getBiometricType();
-      setBioType(type);
-      if (type !== 'none') tryBiometric();
+      try {
+        const type = await getBiometricType();
+        if (!active.current) return;
+        setBioType(type);
+        if (type !== 'none') tryBiometric();
+        else setError(t('deviceLockMissing'));
+      } catch (e) { if (active.current) setError(e.message); }
     })();
+    return () => { active.current = false; };
   }, []);
 
   const tryBiometric = async () => {
-    const result = await authenticate();
-    if (result.success) unlockApp();
-    else setError(t('biometricRetry'));
+    if (pending.current) return;
+    pending.current = true;
+    setBusy(true);
+    try {
+      const result = await authenticate(t('unlockDevice'), { fallback: t('devicePin'), cancel: t('cancel') });
+      if (!active.current) return;
+      if (result.success) unlockApp();
+      else setError(t(result.error === 'device_lock_not_available' ? 'deviceLockMissing' : 'biometricRetry'));
+    } finally {
+      pending.current = false;
+      if (active.current) setBusy(false);
+    }
   };
 
   return (
@@ -41,12 +59,12 @@ export default function BiometricScreen() {
 
         {/* Biometric button */}
         {bioType !== 'none' && (
-          <TouchableOpacity style={s.bioBtn} onPress={tryBiometric}>
-            <Text style={s.bioBtnText}>{bioType === 'face' ? '😊 Face ID' : '👆 Emprènt'}</Text>
+          <TouchableOpacity style={s.bioBtn} onPress={tryBiometric} disabled={busy}>
+            <Text style={s.bioBtnText}>{bioType === 'face' ? 'Face ID' : t(bioType === 'pin' ? 'devicePin' : 'fingerprint')}</Text>
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity onPress={async () => {
+        <TouchableOpacity disabled={busy} onPress={async () => {
           try { await signOutAccount(); logout(); }
           catch (e) { setError(e.message); }
         }}>

@@ -1,6 +1,12 @@
-# Save Me — Exchange 1
+# Save Me — Exchange 1.1
 
 Android-first Expo SDK 51 test version. This is a development build, not an audited security product.
+
+## Exchange 1.1 interface update
+
+One name/phone search field with in-field contacts browsing and lookup actions; inline number errors; a blue five-tab footer with white icons and safe-area padding. Home no longer has the vault-count banner or duplicate quick-action grid. The Alerts tab is removed because there is no real alert backend. Device unlocking now supports an enrolled system PIN when no fingerprint is configured, including on an emulator; it still requires successful system authentication.
+
+This update does not require another SQL migration or a new native module. The existing Exchange 1 SQL/cleanup deployment and native build are still prerequisites. The marker is now **SAVE ME • EXCHANGE 1.1** (translated). Original splash audio, push notifications, account/device recovery and billing remain pending.
 
 ## What this version does
 
@@ -39,7 +45,7 @@ npx expo prebuild --clean --platform android
 npx expo run:android --device
 ```
 
-Stop if a command fails. A Metro reload is insufficient: this update includes a new native file module, icon and permissions/backup changes. The top strip reads **SAVE ME • EXCHANGE 1** (translated) to identify the running JS version. The app's native version is 1.1.0 / versionCode 2.
+Stop if a command fails. A Metro reload is insufficient: this update includes a new native file module, icon and permissions/backup changes. The top strip reads **SAVE ME • EXCHANGE 1.1** (translated) to identify the running JS version. The app's native version is 1.1.0 / versionCode 2.
 
 **Do not uninstall or clear app data during these tests.** This pilot supports one encryption identity per account, stored on one device. It deliberately refuses silent identity replacement. Reinstallation/device migration and encrypted backup recovery are not implemented; losing the keys makes old encrypted content unreadable. Vault codes have no recovery flow.
 
