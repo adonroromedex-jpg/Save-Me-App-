@@ -1,5 +1,6 @@
+import { Alert } from '../components/AppDialog';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, AppState, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, AppState, ActivityIndicator } from 'react-native';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { useIsFocused, useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
@@ -32,7 +33,7 @@ export function CameraScreen({ route, navigation }) {
       }else{
         const exists=await hasVaultCode(userId);
         const code=await askCode({title:t(exists?'vaultCode':'vaultCodeSetup'),hint:t('vaultCodeHint'),create:!exists});if(!code)return;
-        setFiles(await importVaultFile(userId,asset,code.pin));Alert.alert(t('camera'),t('captureSaved'));
+        setFiles(await importVaultFile(userId,asset,code.pin,setProgress));Alert.alert(t('camera'),t('captureSaved'));
       }
     }finally{await removePickerCopy(asset).catch(()=>{});}
   };

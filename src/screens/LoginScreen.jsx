@@ -1,6 +1,7 @@
+import { Alert } from '../components/AppDialog';
 // src/screens/LoginScreen.jsx
 import React, { useState } from 'react';
-import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { View, Text, Image, TextInput, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { requestEmailCode, verifyEmailCode } from '../services/auth';

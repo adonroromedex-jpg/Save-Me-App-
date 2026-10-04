@@ -20,13 +20,13 @@ export function unseal(envelope, publicKey, secretKey) {
   return JSON.parse(bytesToUtf8(plain));
 }
 export const CHUNK_BYTES = 1024 * 1024;
-function chunkNonce(prefix, index) {
+export function chunkNonce(prefix, index) {
   if (!Number.isInteger(index) || index < 0 || index >= 0xffffffff) throw new Error('Invalid chunk');
   const nonce = new Uint8Array(12);
   nonce.set(decode(prefix));
   new DataView(nonce.buffer).setUint32(8, index, false);
   return nonce;
 }
-const context = (manifest, index) => utf8ToBytes(JSON.stringify([manifest.id, manifest.size, manifest.mime, manifest.kind, index]));
+export const context = (manifest, index) => utf8ToBytes(JSON.stringify([manifest.id, manifest.size, manifest.mime, manifest.kind, index]));
 export const encryptChunk = (plain, manifest, index) => gcm(decode(manifest.key), chunkNonce(manifest.prefix, index), context(manifest, index)).encrypt(plain);
 export const decryptChunk = (cipher, manifest, index) => gcm(decode(manifest.key), chunkNonce(manifest.prefix, index), context(manifest, index)).decrypt(cipher);

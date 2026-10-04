@@ -1,9 +1,10 @@
+import { Alert } from '../components/AppDialog';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { filterPhoneContacts, isPhoneQuery } from '../utils/contactSearch';
 import PrivateVideo from '../components/PrivateVideo';
 import { SecureOverlay } from '../components/SecureOverlay';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, BackHandler, FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, BackHandler, FlatList, Image, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
@@ -261,7 +262,13 @@ export default function MessagesScreen({ navigation }) {
           {!!item.expires_at && <Text style={s.time}>{expiryLabel(item)}</Text>}
           <Text style={s.time}>{new Date(item.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</Text>
         </TouchableOpacity>} />
-      {recording?<View style={s.inputRow}><Text style={[s.message,{flex:1}]}>● {seconds}s</Text><TouchableOpacity onPress={abortRecording}><Text style={s.link}>{t('discard')}</Text></TouchableOpacity><TouchableOpacity onPress={stopVoice}><Text style={s.link}>{t('stopRecording')}</Text></TouchableOpacity></View>
+      {recording?<View style={s.recordingCard}>
+        <View style={s.inputRow}><View style={s.recordingIcon}><Ionicons name="mic" size={28} color="#FFFFFF" /></View>
+          <View style={{flex:1}}><Text style={s.recordingLabel}>{t('recordingNow')}</Text><Text style={s.recordingTime}>{Math.floor(seconds/60)}:{String(seconds%60).padStart(2,'0')}</Text></View>
+          <Ionicons name="radio-outline" size={30} color="#FFBAC5" /></View>
+        <View style={s.inputRow}><TouchableOpacity accessibilityLabel={t('discard')} style={s.recordingCancel} onPress={abortRecording}><Ionicons name="trash-outline" size={21} color="#FFFFFF" /></TouchableOpacity>
+          <TouchableOpacity style={s.recordingStop} onPress={stopVoice}><Ionicons name="stop-circle" size={23} color="#FFFFFF" /><Text style={s.recordingLabel}>{t('stopRecording')}</Text></TouchableOpacity></View>
+      </View>
       :voice?<View><Text style={s.hint}>{t('voiceReady')}</Text><View style={s.inputRow}>
         <TouchableOpacity disabled={busy} onPress={()=>play(voice.uri).catch(e=>setError(e.message))}><Text style={s.link}>▶ {t('listen')}</Text></TouchableOpacity>
         <TouchableOpacity disabled={busy} onPress={discardVoice}><Text style={s.link}>{t('discard')}</Text></TouchableOpacity>
@@ -297,6 +304,10 @@ const s = StyleSheet.create({
   bubble: { maxWidth: '80%', padding: 12, borderRadius: 14 }, mine: { alignSelf: 'flex-end', backgroundColor: '#1565C0' },
   theirs: { alignSelf: 'flex-start', backgroundColor: '#22223B' }, message: { color: '#fff', fontSize: 15 },
   time: { color: '#BAC5D9', fontSize: 10, marginTop: 5, textAlign: 'right' },
+  recordingCard:{margin:10,borderRadius:20,backgroundColor:'#382037',borderWidth:1,borderColor:'#C65470'},
+  recordingIcon:{width:52,height:52,borderRadius:26,backgroundColor:'#C53859',alignItems:'center',justifyContent:'center'},
+  recordingLabel:{color:'#FFFFFF',fontWeight:'700',fontSize:14},recordingTime:{color:'#FFD5DD',fontSize:23,fontWeight:'700',fontVariant:['tabular-nums']},
+  recordingCancel:{padding:12,backgroundColor:'#613049',borderRadius:12},recordingStop:{flex:1,flexDirection:'row',gap:10,justifyContent:'center',alignItems:'center',padding:12,borderRadius:12,backgroundColor:'#B62E50'},
   inputRow: { flexDirection: 'row', padding: 12, alignItems: 'center', gap: 8 },
   input: { flex: 1, color: '#fff', backgroundColor: '#22223B', borderRadius: 20, padding: 12 },
   send: { padding: 12, borderRadius: 24, backgroundColor: '#D32F2F' },

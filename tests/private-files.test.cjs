@@ -8,6 +8,7 @@ const expoFS={cacheDirectory:`file://${root}/`,getInfoAsync:async uri=>{const s=
  readAsStringAsync:async(uri,opts)=>{const b=await fs.readFile(filePath(uri));return b.subarray(opts.position||0,opts.length===undefined?undefined:(opts.position||0)+opts.length).toString('base64');},
  writeAsStringAsync:(uri,value)=>fs.writeFile(filePath(uri),Buffer.from(value,'base64'))};
 const load=Module._load;Module._load=function(name,parent,isMain){
+ if(name==='react-native')return{NativeModules:{}};
  if(name==='expo-file-system')return expoFS;
  if(name==='expo-crypto')return{randomUUID:crypto.randomUUID,getRandomBytesAsync:async n=>new Uint8Array(crypto.randomBytes(n))};
  if(name==='react-native-file-access')return{FileSystem:{writeFile:(p,v)=>fs.writeFile(p,Buffer.from(v,'base64')),appendFile:(p,v)=>fs.appendFile(p,Buffer.from(v,'base64'))}};
@@ -22,6 +23,11 @@ test('chunked files round-trip, tampering/cancellation delete partially decrypte
  const m=await p.prepareManifest({uri:sourcePath,type:'video',mimeType:'video/mp4'});assert.equal(m.chunks,3);
  const parts=[];for(let i=0;i<m.chunks;i++){const uri=`file://${root}/part-${i}`;await p.encryptedPart(sourcePath,m,i,uri);parts.push(new Uint8Array(await fs.readFile(filePath(uri))));}
  const output=await p.assemblePrivateFile(m,async i=>parts[i]);assert.deepEqual(await fs.readFile(filePath(output)),source);await p.removePrivateFile(output);
+ let inflight=0, maximum=0;
+ const parallel=await p.assemblePrivateFile(m,async i=>{maximum=Math.max(maximum,++inflight);await new Promise(r=>setTimeout(r,(3-i)*2));inflight--;return parts[i];},async()=>{},3);
+ assert.equal(maximum,3);assert.deepEqual(await fs.readFile(filePath(parallel)),source);await p.removePrivateFile(parallel);
+ await assert.rejects(p.assemblePrivateFile(m,async i=>{inflight++;try{if(i===0)throw Error('download failed');await new Promise(r=>setTimeout(r,5));return parts[i];}finally{inflight--;}},async()=>{},3),/download failed/);
+ assert.equal(inflight,0);assert.deepEqual(await fs.readdir(filePath(p.privateCache)),[]);
  const bad=parts.map(x=>new Uint8Array(x));bad[1][50]^=1;
  await assert.rejects(p.assemblePrivateFile(m,async i=>bad[i]));
  assert.deepEqual(await fs.readdir(filePath(p.privateCache)),[]);

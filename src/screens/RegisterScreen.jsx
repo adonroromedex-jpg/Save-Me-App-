@@ -1,6 +1,7 @@
+import { Alert } from '../components/AppDialog';
 // src/screens/RegisterScreen.jsx
 import React, { useEffect, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { requestEmailCode, verifyEmailCode } from '../services/auth';
 import { useStore } from '../store/useStore';
@@ -10,7 +11,7 @@ export default function RegisterScreen({ navigation }) {
   const { t } = useTranslation();
   const setUser = useStore(s => s.setUser);
 
-  const [form, setForm] = useState({ name: '', firstName: '', countryCode: '', phone: '', email: '' });
+  const [form, setForm] = useState({ name: '', firstName: '', phone: '', email: '' });
   const [step, setStep] = useState(1); // 1=form, 2=verify OTP
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -23,14 +24,12 @@ export default function RegisterScreen({ navigation }) {
   }, [resendSeconds]);
 
   const handleSendOTP = async () => {
-    if (!form.name.trim() || !form.firstName.trim() || !form.countryCode.trim() || !form.phone.trim() || !form.email.trim()) {
+    if (!form.name.trim() || !form.firstName.trim() || !form.phone.trim() || !form.email.trim()) {
       Alert.alert(t('registrationFailed'), t('requiredFields'));
       return;
     }
-    const countryCode = form.countryCode.trim().replace(/[\s()-]/g, '');
-    const nationalNumber = form.phone.trim().replace(/[\s()-]/g, '');
-    const phoneNumber = normalizePhone(nationalNumber, countryCode);
-    if (!/^\+[1-9]\d{0,2}$/.test(countryCode) || !/^\d{4,14}$/.test(nationalNumber) || !phoneNumber) {
+    const phoneNumber = normalizePhone(form.phone);
+    if (!phoneNumber) {
       Alert.alert(t('registrationFailed'), t('invalidPhone'));
       return;
     }
@@ -45,7 +44,6 @@ export default function RegisterScreen({ navigation }) {
         profile: {
           firstName: form.firstName.trim(),
           name: form.name.trim(),
-          countryCode,
           phoneNumber,
         },
       });
@@ -64,9 +62,9 @@ export default function RegisterScreen({ navigation }) {
     setLoading(true);
     try {
       const verified = await verifyEmailCode(form.email, otp);
-      const number = normalizePhone(form.phone, form.countryCode.trim());
+      const number = normalizePhone(form.phone);
       await updateProfile({ firstName: form.firstName, name: form.name, phoneNumber: number });
-      setUser({ ...verified, firstName: form.firstName.trim(), name: form.name.trim(), countryCode: form.countryCode.trim(), phoneNumber: number });
+      setUser({ ...verified, firstName: form.firstName.trim(), name: form.name.trim(), phoneNumber: number });
     } catch (e) {
       Alert.alert(t('verificationFailed'), e.message);
     } finally {
@@ -88,8 +86,7 @@ export default function RegisterScreen({ navigation }) {
             {[
               { key: 'firstName', placeholder: t('firstName') },
               { key: 'name', placeholder: t('name') },
-              { key: 'countryCode', placeholder: t('countryCode'), keyboardType: 'phone-pad' },
-              { key: 'phone', placeholder: t('phoneRequired'), keyboardType: 'phone-pad' },
+              { key: 'phone', placeholder: '+509 00000000', keyboardType: 'phone-pad' },
               { key: 'email', placeholder: t('email'), keyboardType: 'email-address' },
             ].map(field => (
               <TextInput

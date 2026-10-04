@@ -1,8 +1,12 @@
+import * as ImagePicker from 'expo-image-picker';
+import { saveProfilePhoto, loadProfilePhoto } from '../services/profilePhoto';
+import { removePickerCopy } from '../services/vault';
+import { Alert } from '../components/AppDialog';
 // ============================================================
 // src/screens/SettingsScreen.jsx
 // ============================================================
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Image, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { changeAppLanguage } from '../i18n/language';
@@ -19,8 +23,29 @@ const LANGS = [
 export function SettingsScreen({ navigation }) {
   const { t } = useTranslation();
   const { user, language, logout, setUser } = useStore();
+  const locked = useStore(state => state.isLocked);
+  const [photo, setPhoto] = useState(null);
+  useEffect(() => {
+    let active=true; setPhoto(null);
+    if(user?.id && !locked) loadProfilePhoto(user.id).then(uri=>{if(active)setPhoto(uri);}).catch(()=>{});
+    return ()=>{active=false;};
+  }, [user?.id, locked]);
+  const changePhoto = async () => {
+    if(saving)return;
+    let asset;
+    setSaving(true);
+    try {
+      const permission=await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if(!permission.granted) throw new Error(t('galleryPermission'));
+      const result=await ImagePicker.launchImageLibraryAsync({mediaTypes:ImagePicker.MediaTypeOptions.Images,allowsEditing:true,aspect:[1,1],quality:0.4});
+      asset=result.assets?.[0]; if(result.canceled || !asset)return;
+      await saveProfilePhoto(user.id,asset);
+      setPhoto(await loadProfilePhoto(user.id));
+    } catch(error) { Alert.alert(t('profile'),error.message); }
+    finally { if(asset)await removePickerCopy(asset).catch(()=>{}); setSaving(false); }
+  };
   const [edit, setEdit] = useState(false);
-  const [form, setForm] = useState({ firstName: user?.firstName || '', name: user?.name || '', phoneNumber: user?.phoneNumber || '' });
+  const [form, setForm] = useState({ firstName: user?.firstName || '', name: user?.name || '' });
   const [saving, setSaving] = useState(false);
 
   const saveProfile = async () => {
@@ -61,17 +86,19 @@ export function SettingsScreen({ navigation }) {
         <View style={ss.section}>
           <Text style={ss.sectionTitle}>{t('profile')}</Text>
           <View style={ss.profileRow}>
-            <View style={ss.avatar}><Text style={ss.avatarText}>{user ? `${(user.firstName||'U')[0]}${(user.name||'S')[0]}`.toUpperCase() : 'SM'}</Text></View>
+            <View style={ss.avatar}>{photo ? <Image source={{uri:photo}} style={{width:46,height:46,borderRadius:23}} /> : <Text style={ss.avatarText}>{user ? `${(user.firstName||'U')[0]}${(user.name||'S')[0]}`.toUpperCase() : 'SM'}</Text>}</View>
             <View>
               <Text style={ss.profileName}>{user ? `${user.firstName} ${user.name}` : t('profile')}</Text>
               <Text style={ss.profileEmail}>{user?.email || ''}</Text>
             </View>
           </View>
           <Text style={ss.profileEmail}>{user?.phoneNumber || t('phoneMissing')}</Text>
+          <Text style={[ss.profileEmail,{paddingHorizontal:14,paddingVertical:8}]}>{t('profileIdentifiersLocked')}</Text>
+          <TouchableOpacity disabled={saving} style={ss.item} onPress={changePhoto}><Text style={ss.itemLabel}>{t('changeProfilePhoto')}</Text></TouchableOpacity>
+          <Text style={[ss.profileEmail,{paddingHorizontal:14,paddingBottom:12}]}>{t('profilePhotoLocal')}</Text>
           {edit ? <View style={{ padding: 14 }}>
-            {['firstName', 'name', 'phoneNumber'].map(key => <TextInput key={key} style={ss.input}
-              placeholder={t(key === 'phoneNumber' ? 'phoneFull' : key)} placeholderTextColor="#999"
-              keyboardType={key === 'phoneNumber' ? 'phone-pad' : 'default'}
+            {['firstName', 'name'].map(key => <TextInput key={key} style={ss.input}
+              placeholder={t(key)} placeholderTextColor="#999"
               value={form[key]} onChangeText={value => setForm(previous => ({ ...previous, [key]: value }))} />)}
             <TouchableOpacity style={ss.item} disabled={saving} onPress={saveProfile}><Text style={ss.itemLabel}>{t('saveProfile')}</Text></TouchableOpacity>
           </View> : <TouchableOpacity style={ss.item} onPress={() => setEdit(true)}><Text style={ss.itemLabel}>{t('editProfile')}</Text></TouchableOpacity>}

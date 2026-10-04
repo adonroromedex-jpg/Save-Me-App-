@@ -1,7 +1,8 @@
+import { NativeModules } from 'react-native';
 import * as FileSystem from 'expo-file-system';
 import { FileSystem as NativeFS } from 'react-native-file-access';
 import * as Crypto from 'expo-crypto';
-import { CHUNK_BYTES, encode, decode, encryptChunk, decryptChunk } from './cryptoCore';
+import { CHUNK_BYTES, encode, decode, encryptChunk, decryptChunk, chunkNonce, context } from './cryptoCore';
 import { MAX_MEDIA_BYTES, MEDIA_LIMIT_LABEL } from './mediaLimits';
 
 export const pathOnly = uri => uri.replace(/^file:\/\//, '');
@@ -19,25 +20,43 @@ export function validateManifest(m) {
       decode(m.key).length !== 32 || decode(m.prefix).length !== 8 || !['image','video','audio'].includes(m.kind)) throw new Error('Invalid encrypted file');
 }
 export async function encryptedPart(uri, manifest, index, target) {
+  if (NativeModules.SaveMeCrypto) return NativeModules.SaveMeCrypto.encryptPart(uri, target, index * CHUNK_BYTES,
+    Math.min(CHUNK_BYTES, manifest.size - index * CHUNK_BYTES), manifest.key, encode(chunkNonce(manifest.prefix, index)), encode(context(manifest,index)));
   const plain = decode(await FileSystem.readAsStringAsync(uri, { encoding: 'base64', position: index * CHUNK_BYTES, length: Math.min(CHUNK_BYTES, manifest.size - index * CHUNK_BYTES) }));
   const ciphertext = encryptChunk(plain, manifest, index);
   plain.fill(0);
   await FileSystem.writeAsStringAsync(target, encode(ciphertext), { encoding: 'base64' });
 }
-export async function assemblePrivateFile(manifest, fetchPart, checkActive = async () => {}) {
+export async function assemblePrivateFile(manifest, fetchPart, checkActive = async () => {}, prefetch = 1) {
   validateManifest(manifest);
+  if (![1,2,3].includes(prefetch)) throw new Error('Invalid prefetch bound');
   await FileSystem.makeDirectoryAsync(privateCache, { intermediates: true });
   const extension = ({ 'image/png': 'png', 'image/webp': 'webp', 'video/quicktime': 'mov', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3' })[manifest.mime] || (manifest.kind === 'video' ? 'mp4' : 'jpg');
   const output = `${privateCache}${Crypto.randomUUID()}.${extension}`;
   await NativeFS.writeFile(pathOnly(output), '', 'base64');
   try {
-    for (let index = 0; index < manifest.chunks; index++) {
+    for (let start = 0; start < manifest.chunks; start += prefetch) {
       await checkActive();
-      const cipher = await fetchPart(index);
-      const plain = decryptChunk(cipher, manifest, index);
-      if (plain.length !== Math.min(CHUNK_BYTES, manifest.size - index * CHUNK_BYTES)) throw new Error('Incomplete encrypted file');
-      await NativeFS.appendFile(pathOnly(output), encode(plain), 'base64');
-      plain.fill(0);
+      // Drain every request before cleanup and retain at most three encrypted chunks.
+      const results = await Promise.allSettled(Array.from({length: Math.min(prefetch, manifest.chunks-start)}, (_,n) => fetchPart(start+n)));
+      const failed = results.find(result => result.status === 'rejected');
+      if (failed) throw failed.reason;
+      for (let n = 0; n < results.length; n++) {
+        const index = start+n, cipher = results[n].value;
+        await checkActive();
+        if (NativeModules.SaveMeCrypto) {
+          await NativeModules.SaveMeCrypto.decryptAppend(encode(cipher), output,
+            Math.min(CHUNK_BYTES, manifest.size - index * CHUNK_BYTES), manifest.key,
+            encode(chunkNonce(manifest.prefix,index)), encode(context(manifest,index)));
+        } else {
+          const plain = decryptChunk(cipher, manifest, index);
+          try {
+            if (plain.length !== Math.min(CHUNK_BYTES, manifest.size - index * CHUNK_BYTES)) throw new Error('Incomplete encrypted file');
+            await NativeFS.appendFile(pathOnly(output), encode(plain), 'base64');
+          } finally { plain.fill(0); }
+        }
+        results[n].value = null;
+      }
     }
     await checkActive();
     return output;

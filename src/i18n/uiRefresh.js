@@ -1,5 +1,11 @@
 export const uiRefresh = {
   ht: {
+    profilePhoneNeeded: "Kont sa a pa gen nimewo telefòn anrejistre; kontak yo pa ka jwenn li pa nimewo.",
+    profileIdentifiersLocked: "Nimewo telefòn ak imèl la pa modifyab.",
+    changeProfilePhoto: "Chanje foto pwofil",
+    profilePhotoLocal: "Foto sa a chifre epi li rete sou aparèy sa a sèlman.",
+    recordingNow: "Anrejistreman an ap mache",
+
     contactSearchPlaceholder: 'Non / +509 00000000',
     contactSearchHint: 'Tape nimewo konplè a pou chèche sou Save Me, oswa peze ikon kontak la pou browse kontak telefòn ou.',
     contactSearchRequired: 'Tape yon nimewo oswa chwazi yon kontak.',
@@ -7,9 +13,15 @@ export const uiRefresh = {
     homePrivateSpace: 'Espas prive ou', homeVaultHint: 'Sèvi ak Vault oswa Kamera nan meni anba a pou ajoute pwòp foto ak videyo ou.',
     unlockDevice: 'Debloke ak sekirite telefòn nan', devicePin: 'PIN telefòn', fingerprint: 'Anprent',
     deviceLockMissing: 'Mete yon PIN oswa anprent nan paramèt sekirite aparèy la, oswa konekte ankò ak imèl ou.',
-    exchangePilot: 'SAVE ME • ECHANJ 1.1',
+    exchangePilot: 'SAVE ME • ECHANJ 1.2',
   },
   en: {
+    profilePhoneNeeded: "This account has no saved phone number; contacts cannot find it by number.",
+    profileIdentifiersLocked: "Phone number and email cannot be edited.",
+    changeProfilePhoto: "Change profile photo",
+    profilePhotoLocal: "This photo is encrypted and stays on this device only.",
+    recordingNow: "Recording in progress",
+
     contactSearchPlaceholder: 'Name / +509 00000000',
     contactSearchHint: 'Enter a full number to search Save Me, or tap the contacts icon to browse your phone contacts.',
     contactSearchRequired: 'Enter a number or choose a contact.',
@@ -17,9 +29,15 @@ export const uiRefresh = {
     homePrivateSpace: 'Your private space', homeVaultHint: 'Use Vault or Camera in the bottom menu to add your own photos and videos.',
     unlockDevice: 'Unlock with device security', devicePin: 'Device PIN', fingerprint: 'Fingerprint',
     deviceLockMissing: 'Set a PIN or fingerprint in your device security settings, or sign in again with your email.',
-    exchangePilot: 'SAVE ME • EXCHANGE 1.1',
+    exchangePilot: 'SAVE ME • EXCHANGE 1.2',
   },
   fr: {
+    profilePhoneNeeded: "Ce compte n’a pas de numéro enregistré ; vos contacts ne peuvent pas le trouver par numéro.",
+    profileIdentifiersLocked: "Le numéro et l’adresse e-mail ne sont pas modifiables.",
+    changeProfilePhoto: "Changer la photo de profil",
+    profilePhotoLocal: "Cette photo est chiffrée et reste uniquement sur cet appareil.",
+    recordingNow: "Enregistrement en cours",
+
     contactSearchPlaceholder: 'Nom / +509 00000000',
     contactSearchHint: 'Saisissez un numéro complet pour chercher sur Save Me, ou touchez l’icône contacts pour parcourir votre répertoire.',
     contactSearchRequired: 'Saisissez un numéro ou choisissez un contact.',
@@ -27,9 +45,15 @@ export const uiRefresh = {
     homePrivateSpace: 'Votre espace privé', homeVaultHint: 'Utilisez Coffre ou Caméra dans le menu du bas pour ajouter vos photos et vidéos personnelles.',
     unlockDevice: 'Déverrouiller avec la sécurité du téléphone', devicePin: 'PIN du téléphone', fingerprint: 'Empreinte',
     deviceLockMissing: 'Configurez un PIN ou une empreinte dans les paramètres de sécurité de l’appareil, ou reconnectez-vous par e-mail.',
-    exchangePilot: 'SAVE ME • ÉCHANGE 1.1',
+    exchangePilot: 'SAVE ME • ÉCHANGE 1.2',
   },
   es: {
+    profilePhoneNeeded: "Esta cuenta no tiene número registrado; los contactos no pueden encontrarla por número.",
+    profileIdentifiersLocked: "El número y el correo no se pueden editar.",
+    changeProfilePhoto: "Cambiar foto de perfil",
+    profilePhotoLocal: "Esta foto está cifrada y permanece solo en este dispositivo.",
+    recordingNow: "Grabación en curso",
+
     contactSearchPlaceholder: 'Nombre / +509 00000000',
     contactSearchHint: 'Escribe un número completo para buscar en Save Me, o toca el icono de contactos para ver tu agenda.',
     contactSearchRequired: 'Escribe un número o elige un contacto.',
@@ -37,6 +61,6 @@ export const uiRefresh = {
     homePrivateSpace: 'Tu espacio privado', homeVaultHint: 'Usa Bóveda o Cámara en el menú inferior para añadir tus propias fotos y vídeos.',
     unlockDevice: 'Desbloquear con la seguridad del teléfono', devicePin: 'PIN del teléfono', fingerprint: 'Huella',
     deviceLockMissing: 'Configura un PIN o una huella en los ajustes de seguridad del dispositivo, o inicia sesión de nuevo por correo.',
-    exchangePilot: 'SAVE ME • INTERCAMBIO 1.1',
+    exchangePilot: 'SAVE ME • INTERCAMBIO 1.2',
   },
 };

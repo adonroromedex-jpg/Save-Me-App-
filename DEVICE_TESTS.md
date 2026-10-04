@@ -38,3 +38,14 @@ Repeat wrong-code and RLS checks against the real Supabase project; local databa
 - Search with a full formatted number, an invalid number, an accented contact name, and a phone number with spaces. Only one input should appear; the contacts icon requests phone-book access on demand.
 - Confirm five footer tabs, white icons on blue, an active-tab highlight and correct spacing above the Android navigation bar. Home has no vault-count banner, duplicate action grid or Alerts shortcut.
 - In Android Settings on the emulator, configure a device PIN; reopen Save Me and test successful PIN unlock, cancellation and wrong PIN. A device without a configured lock must require email sign-in instead.
+
+## Exchange 1.2 acceptance checks
+
+- Rebuild with `npx expo prebuild --platform android --no-install` then `npx expo run:android --variant release --device`. Do not uninstall/clear data. The config plugin registers SaveMeCrypto; a Metro-only update leaves the older JS crypto path active.
+- On both phones use the same 5 MB photo and 30–50 MB video, same network, three trials each. Record time separately for vault import, vault reopening, chat send and recipient reopening. Compare medians with the previous build, alongside network upload speed; no specific latency improvement is assumed.
+- Open pre-update vault files and chat media. Verify wrong PIN and tampered data remain rejected. Go offline during viewing, background during transfer, and test 24-hour expiry.
+- Cancel/fail one of three concurrent uploads. Verify no ready message appears and pending chunks are removed by cancellation or cleanup.
+- Register with one full international number; malformed/missing country prefix must show an error. Profile editing must expose names/photo only. Verify local profile photo persists across restart and is not exported to Gallery or shared to another account.
+- Record a voice message: white mic, contrasting recording panel, timer, discard and stop; listen before sending.
+- Verify dialogs fit smaller screens, long text scrolls, destructive actions require pressing the intended button, and background/lock dismisses dialogs.
+- Original splash image replacement awaits the user's attachment.

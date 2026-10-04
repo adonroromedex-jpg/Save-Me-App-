@@ -43,8 +43,7 @@ async function readPeerIdentity(userId, peerId) {
   return data;
 }
 export async function encryptForPair(userId, peerId, value) {
-  const own = await ensureIdentity(userId);
-  const peer = await peerIdentity(userId, peerId);
+  const [own, peer] = await Promise.all([ensureIdentity(userId), peerIdentity(userId, peerId)]);
   return {
     sender_key: own.publicKey, recipient_key: peer,
     sender: seal(value, own.publicKey, own.secretKey, await Crypto.getRandomBytesAsync(24)),
@@ -52,10 +51,9 @@ export async function encryptForPair(userId, peerId, value) {
   };
 }
 export async function decryptForSelf(userId, row, envelopes) {
-  const own = await ensureIdentity(userId);
   const isSender = row.sender_id === userId;
   const peerId = isSender ? row.recipient_id : row.sender_id;
-  const peer = await peerIdentity(userId, peerId);
+  const [own, peer] = await Promise.all([ensureIdentity(userId), peerIdentity(userId, peerId)]);
   if (envelopes.sender_key !== (isSender ? own.publicKey : peer) || envelopes.recipient_key !== (isSender ? peer : own.publicKey)) {
     throw new Error('Kle mesaj la pa koresponn ak kontak verifye a.');
   }

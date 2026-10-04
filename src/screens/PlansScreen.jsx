@@ -1,8 +1,9 @@
+import { Alert } from '../components/AppDialog';
 // ============================================================
 // src/screens/PlansScreen.jsx
 // ============================================================
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 

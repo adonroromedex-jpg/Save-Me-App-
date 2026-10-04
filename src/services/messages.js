@@ -1,3 +1,4 @@
+import { transferQueue } from './transferQueue';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system';
 import { getSupabaseClient } from './supabase';
@@ -25,15 +26,20 @@ export async function syncProfile(user) {
     id: user.id,
     first_name: metadata.firstName || existing?.first_name || '',
     last_name: metadata.name || existing?.last_name || '',
-    phone_e164: phone || existing?.phone_e164 || null,
+    phone_e164: existing?.phone_e164 || phone || null,
   };
   requireData(await client().from('profiles').upsert(profile, { onConflict: 'id' }));
   return profile;
 }
 
+// Registration supplies the phone once; profile editing changes names only.
 export async function updateProfile({ firstName, name, phoneNumber }) {
-  const phone = normalizePhone(phoneNumber);
-  if (!phone || !firstName.trim() || !name.trim()) throw new Error('Non, prenon ak nimewo konplè (+indicatif) obligatwa.');
+  if (!firstName.trim() || !name.trim()) throw new Error('Non ak prenon obligatwa.');
+  const session = requireData(await client().auth.getUser());
+  if (!session.user) throw new Error('Konekte ankò.');
+  const existing = requireData(await client().from('profiles').select('phone_e164').eq('id', session.user.id).maybeSingle());
+  const phone = existing?.phone_e164 || normalizePhone(session.user.user_metadata?.phoneNumber || phoneNumber);
+  if (!phone) throw new Error('Mete nimewo konplè a pandan enskripsyon an.');
   const { data: { user }, error } = await client().auth.updateUser({ data: {
     firstName: firstName.trim(), name: name.trim(), phoneNumber: phone,
   } });
@@ -103,15 +109,18 @@ export async function sendMedia(userId, peerId, asset, pin, onProgress = () => {
     p_id: id, p_peer: peerId, p_kind: asset.type, p_parts: manifest.chunks, p_envelopes: envelopes, p_pin: pin || null,
   }));
   await FileSystem.makeDirectoryAsync(privateCache, { intermediates: true });
-  const temporary = `${privateCache}upload-${id}.bin`;
   const uploaded = [];
+  let completed = 0;
   try {
-    for (let index = 0; index < manifest.chunks; index++) {
+    const { data: { session }, error } = await client().auth.getSession();
+    if (error) throw error;
+    if (!session) throw new Error('Konekte ankò.');
+    await transferQueue(manifest.chunks, async index => {
+      const temporary = `${privateCache}upload-${id}-${index}.bin`;
+      try {
       requireActive();
       await encryptedPart(asset.uri, manifest, index, temporary);
-      const { data: { session }, error } = await client().auth.getSession();
-      if (error) throw error;
-      if (!session) throw new Error('Konekte ankò.');
+      requireActive();
       const object = `${path}/${index}.bin`;
       // Include uncertain uploads in cleanup too: the server may have accepted bytes before a network error.
       uploaded.push(object);
@@ -121,8 +130,9 @@ export async function sendMedia(userId, peerId, asset, pin, onProgress = () => {
           'Content-Type': 'application/octet-stream', 'x-upsert': 'false' },
       });
       if (result.status < 200 || result.status >= 300) throw new Error(`Upload echwe (${result.status}).`);
-      onProgress(Math.round((index + 1) / manifest.chunks * 100));
-    }
+      onProgress(Math.round(++completed / manifest.chunks * 100));
+      } finally { await removePrivateFile(temporary); }
+    });
     requireActive();
     requireData(await client().rpc('finish_encrypted_media', { p_id: id }));
   } catch (error) {
@@ -131,7 +141,7 @@ export async function sendMedia(userId, peerId, asset, pin, onProgress = () => {
       await client().rpc('cancel_encrypted_media', { p_id: id });
     } catch {} // Pending rows are also swept by the scheduled server cleanup.
     throw error;
-  } finally { await removePrivateFile(temporary); }
+  }
   return id;
 }
 function checkAuthorization(data) {
@@ -161,16 +171,27 @@ export async function openMedia(userId, message, pin, onProgress = () => {}) {
     if (performance.now() >= authorization.deadline) throw new Error('Medya ekspire.');
     if (performance.now() - checked > 5000) { authorization = await authorizeMedia(message.id); checked = performance.now(); }
   };
+  let signed = [], signedAt = 0, signing = null, completed = 0;
   const uri = await assemblePrivateFile(manifest, async index => {
-    const { signedUrl } = requireData(await client().storage.from('chat-media').createSignedUrl(`${grant.path}/${index}.bin`, 15));
+    if (!signed[index] || performance.now() - signedAt > 10000) {
+      if (!signing) signing = (async () => {
+        const first = Math.floor(index/3)*3;
+        const paths = Array.from({length: Math.min(3, manifest.chunks-first)}, (_,n) => `${grant.path}/${first+n}.bin`);
+        const urls = requireData(await client().storage.from('chat-media').createSignedUrls(paths, 15));
+        signed = []; signedAt = performance.now();
+        urls.forEach((entry,n) => { if(entry.error || !entry.signedUrl) throw new Error('Telechajman pa otorize.'); signed[first+n] = entry.signedUrl; });
+      })().finally(() => { signing = null; });
+      await signing;
+    }
+    const signedUrl = signed[index];
     const temporary = `${privateCache}download-${Crypto.randomUUID()}.bin`;
     try {
       const result = await FileSystem.downloadAsync(signedUrl, temporary);
       if (result.status !== 200) throw new Error('Telechajman echwe.');
-      onProgress(Math.round((index + 1) / manifest.chunks * 100));
+      onProgress(Math.round(++completed / manifest.chunks * 100));
       return decode(await FileSystem.readAsStringAsync(temporary, { encoding: 'base64' }));
     } finally { await removePrivateFile(temporary); }
-  }, assertAllowed);
+  }, assertAllowed, 3);
   try {
     authorization = await authorizeMedia(message.id);
     requireActive();

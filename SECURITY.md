@@ -33,3 +33,8 @@ RPCs own message mutations; authenticated clients cannot change sender, recipien
 The scheduled cleanup must use the new chunk-aware implementation. It removes object bytes via the Storage API before deleting message rows and their secret envelopes. SQL row deletion alone would orphan Storage data. The five-minute schedule means physical cleanup may occur after access has already expired. Overall account/storage quotas, abuse reporting, message consent requests and production monitoring need separate work.
 
 Phone ownership is not verified. Do not equate phone lookup with identity authentication. Do not publish tokens, media codes or private keys in logs/issues.
+
+### Exchange 1.2 implementation notes
+Android uses platform AES/GCM/NoPadding with a 128-bit tag and the same 96-bit per-chunk nonce/AAD as v2. PBKDF2-HMAC-SHA256 remains 210,000 iterations (native on Android 26+). Chunk plaintext is authenticated before append; native buffers are cleared in finally blocks. Crypto work uses two worker threads and uploads at most three requests. Failed upload workers drain before cleanup. JS fallback and legacy vault readers remain. Native code is installed by the checked-in Expo config plugin, not an external dependency.
+
+Profile photos are an explicitly local-only feature, encrypted with a random SecureStore key. They are rendered from memory rather than exported plaintext files. As with other JS strings, immediate erasure of in-memory base64 cannot be guaranteed. Names can change; phone/email editing is removed from the app, which is not a server-wide prohibition on a separately authorized Auth API email change.

@@ -7,6 +7,7 @@ import { usePreventScreenCapture } from 'expo-screen-capture';
 import { useTranslation } from 'react-i18next';
 import { restoreAppLanguage } from './src/i18n/language';
 import { SecureOverlayProvider } from './src/components/SecureOverlay';
+import { AppDialogHost } from './src/components/AppDialog';
 import AppNavigator from './src/navigation/AppNavigator';
 import useAutoLock from './src/hooks/useAutoLock';
 import { getSupabaseClient } from './src/services/supabase';
@@ -88,6 +89,7 @@ export default function App() {
           <StatusBar style="light" />
           <AppNavigator />
         </NavigationContainer>
+        <AppDialogHost />
         </SecureOverlayProvider>
       </SafeAreaView>
     </SafeAreaProvider>

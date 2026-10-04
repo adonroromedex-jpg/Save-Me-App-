@@ -1,12 +1,16 @@
-# Save Me — Exchange 1.1
+# Save Me — Exchange 1.2
 
 Android-first Expo SDK 51 test version. This is a development build, not an audited security product.
 
-## Exchange 1.1 interface update
+## Exchange 1.2 — performance and interface
 
-One name/phone search field with in-field contacts browsing and lookup actions; inline number errors; a blue five-tab footer with white icons and safe-area padding. Home no longer has the vault-count banner or duplicate quick-action grid. The Alerts tab is removed because there is no real alert backend. Device unlocking now supports an enrolled system PIN when no fingerprint is configured, including on an emulator; it still requires successful system authentication.
+Android AES-GCM chunk encryption/decryption and vault PBKDF2 now run in a bounded native worker pool. Imports read file offsets directly instead of copying plaintext through base64 on the JS/UI thread. The v2 format and 210,000 PBKDF2 iterations remain unchanged. Android 24–25 and platforms without the module retain the JS KDF; the JS media implementation remains a compatibility fallback for old builds/iOS.
 
-This update does not require another SQL migration or a new native module. The existing Exchange 1 SQL/cleanup deployment and native build are still prerequisites. The marker is now **SAVE ME • EXCHANGE 1.1** (translated). Original splash audio, push notifications, account/device recovery and billing remain pending.
+Chat uploads use at most three simultaneous requests, wait for in-flight work before failure cleanup, and fetch the session once per transfer. Downloads prefetch at most three encrypted chunks, request signed URLs in short-lived groups, and authenticate/append plaintext in order. Vault/camera imports show progress. No compression or bandwidth guarantee is claimed: large original videos still depend on connection speed. Measure with a release build on real devices; device timings have not been measured here.
+
+Registration has one international phone field. Settings edits names and a local encrypted profile picture; phone and email are read-only in this app. Existing saved profile numbers take precedence over new metadata. This is an application restriction, not a new server-wide Auth email-change policy. The profile picture is local only, not shared with contacts. Voice recording has a contrasting microphone/timer panel. App dialogs use styled overlays inside the protected Activity window.
+
+**A new Android build is required.** The Expo config plugin installs the native crypto module during prebuild, including clean prebuilds. No new SQL or Edge Function deployment is needed beyond Exchange 1. The marker is **SAVE ME • EXCHANGE 1.2** (translated). The original replacement splash image/audio has not been supplied; the existing animated splash remains.
 
 ## What this version does
 
@@ -41,11 +45,11 @@ After successfully pulling `restore-uploaded-app`, run:
 
 ```powershell
 npm ci
-npx expo prebuild --clean --platform android
-npx expo run:android --device
+npx expo prebuild --platform android --no-install
+npx expo run:android --variant release --device
 ```
 
-Stop if a command fails. A Metro reload is insufficient: this update includes a new native file module, icon and permissions/backup changes. The top strip reads **SAVE ME • EXCHANGE 1.1** (translated) to identify the running JS version. The app's native version is 1.1.0 / versionCode 2.
+Stop if a command fails. A Metro reload is insufficient: this update includes a new native file module, icon and permissions/backup changes. The top strip reads **SAVE ME • EXCHANGE 1.2** (translated) to identify the running JS version. The app's native version is 1.2.0 / versionCode 3.
 
 **Do not uninstall or clear app data during these tests.** This pilot supports one encryption identity per account, stored on one device. It deliberately refuses silent identity replacement. Reinstallation/device migration and encrypted backup recovery are not implemented; losing the keys makes old encrypted content unreadable. Vault codes have no recovery flow.
 
@@ -53,7 +57,7 @@ Stop if a command fails. A Metro reload is insufficient: this update includes a 
 
 Supabase Authentication → Email Templates must include `{{ .Token }}` in **both Confirm signup and Magic Link**, rather than `{{ .ConfirmationURL }}`. Keep custom SMTP configured. A successful OTP API request means Supabase accepted it, not that the inbox received it. Inspect Auth/SMTP provider delivery logs if only existing accounts receive mail. Registration includes resend cooldown and email correction.
 
-Old accounts without a number must add their full international phone number in Settings. Numbers are not verified by SMS, so matching a number does not prove identity. Contact lookups send only the selected number; the address book is not uploaded. Both accounts must launch this new version online once to register their public keys before exchanging encrypted messages.
+Accounts created without a phone number need an administrative correction; Settings no longer changes phone numbers. Numbers are not verified by SMS, so matching a number does not prove identity. Contact lookups send only the selected number; the address book is not uploaded. Both accounts must launch this new version online once to register their public keys before exchanging encrypted messages.
 
 ## Validation
 
@@ -62,6 +66,8 @@ npm test
 npx expo export --platform android
 npx expo prebuild --clean --platform android --no-install
 ```
+
+Native compatibility tests compile the production Java module with Android/React bridge stubs and exercise JDK AES-GCM/PBKDF2 against independent Node crypto vectors. They do not replace an Android APK/device test. They require a JDK (otherwise that test is explicitly skipped). Transfer tests check concurrency bounds and draining before cleanup.
 
 Automated tests cover authenticated encryption/tamper rejection, SQL RLS with three users, key registration, code lockout, server-controlled dates, text/voice retention, blocks and chunk path validation. SQL tests run in PGlite with deterministic **test-only pgcrypto fixtures**; they do not validate real bcrypt, Supabase Storage HTTP, Cron or device behavior. See [SECURITY.md](SECURITY.md) for the security boundaries and [DEVICE_TESTS.md](DEVICE_TESTS.md) for the required phone checks.
 

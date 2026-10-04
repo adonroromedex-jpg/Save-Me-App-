@@ -1,7 +1,8 @@
+import { Alert } from '../components/AppDialog';
 import PrivateVideo from '../components/PrivateVideo';
 import { SecureOverlay } from '../components/SecureOverlay';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, FlatList, Image,  StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, AppState, FlatList, Image,  StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +22,7 @@ export default function VaultScreen() {
   const setFiles = useStore(s => s.setFiles);
   const [files, updateFiles] = useState([]);
   const [search, setSearch] = useState('');
+  const [progress, setProgress] = useState(0);
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(null);
   const previewEpoch = useRef(0);
@@ -50,23 +52,24 @@ export default function VaultScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.All, quality: 1 });
     if (result.canceled || !result.assets?.[0]) return;
     const asset = result.assets[0];
-    setBusy(true);
+    setProgress(0); setBusy(true);
     try {
       if (useStore.getState().isLocked) throw new Error(t('unlockBeforeImport'));
       const code = await getCode();
       if (!code) return;
-      const next = await importVaultFile(userId, asset, code.pin); updateFiles(next); setFiles(next);
+      const next = await importVaultFile(userId, asset, code.pin, setProgress); updateFiles(next); setFiles(next);
     }
     catch (e) { Alert.alert(t('vault'), e.message); }
     finally { await removePickerCopy(asset).catch(() => {}); setBusy(false); }
   };
 
   const showFile = async item => {
-    setBusy(true);
+    if (busy) return;
+    setProgress(0); setBusy(true);
     try {
       const code = await getCode(); if (!code) return;
       const epoch = previewEpoch.current;
-      const uri = await openVaultFile(userId, item, code.pin);
+      const uri = await openVaultFile(userId, item, code.pin, setProgress);
       if (epoch !== previewEpoch.current) { await removeVaultPreview(uri); return; }
       setPreview({ uri, type: item.type });
     }
@@ -89,10 +92,10 @@ export default function VaultScreen() {
     </View>
     <Text style={s.hint}>{t('vaultImportHint')}</Text>
     <TextInput style={s.input} placeholder={t('searchFiles')} placeholderTextColor="#888" value={search} onChangeText={setSearch} />
-    {busy && <ActivityIndicator color="#D32F2F" />}
+    {busy && <View style={{alignItems:"center",padding:12,gap:8}}><ActivityIndicator color="#82B9FF" /><Text style={s.hint}>{progress}%</Text></View>}
     <FlatList data={visible} keyExtractor={item => item.id} numColumns={2} contentContainerStyle={s.grid}
       ListEmptyComponent={<Text style={s.empty}>{t('vaultEmpty')}</Text>}
-      renderItem={({ item }) => <TouchableOpacity style={s.card} onPress={() => showFile(item)} onLongPress={() => confirmDelete(item)}>
+      renderItem={({ item }) => <TouchableOpacity style={s.card} disabled={busy} onPress={() => showFile(item)} onLongPress={() => confirmDelete(item)}>
         <Text style={s.icon}>{item.type === 'video' ? '🎬' : '🖼️'}</Text>
         <Text style={s.name}>{item.type === 'video' ? t('video') : t('photo')} · {new Date(item.createdAt).toLocaleDateString()}</Text>
         <Text style={s.meta}>{(item.size / 1048576).toFixed(1)} MB · AES-256-GCM</Text>

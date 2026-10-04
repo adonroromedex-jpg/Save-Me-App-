@@ -1,6 +1,7 @@
+import { Alert } from '../components/AppDialog';
 // src/screens/WelcomeScreen.jsx
 import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { changeAppLanguage } from '../i18n/language';
 import { useStore } from '../store/useStore';
