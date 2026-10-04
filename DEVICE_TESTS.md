@@ -48,4 +48,4 @@ Repeat wrong-code and RLS checks against the real Supabase project; local databa
 - Register with one full international number; malformed/missing country prefix must show an error. Profile editing must expose names/photo only. Verify local profile photo persists across restart and is not exported to Gallery or shared to another account.
 - Record a voice message: white mic, contrasting recording panel, timer, discard and stop; listen before sending.
 - Verify dialogs fit smaller screens, long text scrolls, destructive actions require pressing the intended button, and background/lock dismisses dialogs.
-- Original splash image replacement awaits the user's attachment.
+- Splash: confirm the updated artwork has no “Byenvini”; large “Welcome” and small “SaveMe please” fade in, then the screen closes three seconds after image load. Check short screens and portrait tablets for uncropped artwork.

@@ -10,7 +10,7 @@ Chat uploads use at most three simultaneous requests, wait for in-flight work be
 
 Registration has one international phone field. Settings edits names and a local encrypted profile picture; phone and email are read-only in this app. Existing saved profile numbers take precedence over new metadata. This is an application restriction, not a new server-wide Auth email-change policy. The profile picture is local only, not shared with contacts. Voice recording has a contrasting microphone/timer panel. App dialogs use styled overlays inside the protected Activity window.
 
-**A new Android build is required.** The Expo config plugin installs the native crypto module during prebuild, including clean prebuilds. No new SQL or Edge Function deployment is needed beyond Exchange 1. The marker is **SAVE ME • EXCHANGE 1.2** (translated). The original replacement splash image/audio has not been supplied; the existing animated splash remains.
+**A new Android build is required.** The Expo config plugin installs the native crypto module during prebuild, including clean prebuilds. No new SQL or Edge Function deployment is needed beyond Exchange 1. The marker is **SAVE ME • EXCHANGE 1.2** (translated). The refreshed blue/red welcome artwork is integrated. Live text reads “Welcome” in large type and “SaveMe please” in small type, fading in for 1.8 seconds within a three-second splash after image load. Original splash audio remains unavailable.
 
 ## What this version does
 
