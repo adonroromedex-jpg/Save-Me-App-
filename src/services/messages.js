@@ -1,9 +1,10 @@
+import { transferTimer } from './transferMetrics';
 import { transferQueue } from './transferQueue';
 import * as Crypto from 'expo-crypto';
 import * as FileSystem from 'expo-file-system';
 import { getSupabaseClient } from './supabase';
 import { encryptForPair, decryptForSelf } from './identity';
-import { prepareManifest, encryptedPart, assemblePrivateFile, privateCache, removePrivateFile } from './privateFiles';
+import { prepareManifest, encryptedPart, assemblePrivateFile, nativeFileCrypto, privateCache, removePrivateFile } from './privateFiles';
 import { decode } from './cryptoCore';
 import { useStore } from '../store/useStore';
 import { AppState } from 'react-native';
@@ -24,11 +25,13 @@ export async function syncProfile(user) {
   // Repair incomplete legacy profiles; do not erase a saved field when old metadata is missing.
   const profile = {
     id: user.id,
-    first_name: metadata.firstName || existing?.first_name || '',
-    last_name: metadata.name || existing?.last_name || '',
+    first_name: existing?.first_name || metadata.firstName || metadata.first_name || '',
+    last_name: existing?.last_name || metadata.name || metadata.last_name || '',
     phone_e164: existing?.phone_e164 || phone || null,
   };
-  requireData(await client().from('profiles').upsert(profile, { onConflict: 'id' }));
+  if (!existing || ['first_name','last_name','phone_e164'].some(key => existing[key] !== profile[key])) {
+    requireData(await client().from('profiles').upsert(profile, { onConflict: 'id' }));
+  }
   return profile;
 }
 
@@ -40,13 +43,14 @@ export async function updateProfile({ firstName, name, phoneNumber }) {
   const existing = requireData(await client().from('profiles').select('phone_e164').eq('id', session.user.id).maybeSingle());
   const phone = existing?.phone_e164 || normalizePhone(session.user.user_metadata?.phoneNumber || phoneNumber);
   if (!phone) throw new Error('Mete nimewo konplè a pandan enskripsyon an.');
-  const { data: { user }, error } = await client().auth.updateUser({ data: {
-    firstName: firstName.trim(), name: name.trim(), phoneNumber: phone,
-  } });
-  if (error) throw error;
-  requireData(await client().from('profiles').upsert({
-    id: user.id, first_name: firstName.trim(), last_name: name.trim(), phone_e164: phone,
-  }, { onConflict: 'id' }));
+  const fields={firstName:firstName.trim(),name:name.trim(),phoneNumber:phone};
+  requireData(await client().from('profiles').upsert({id:session.user.id,first_name:fields.firstName,last_name:fields.name,phone_e164:phone},{onConflict:'id'}));
+  const current=useStore.getState().user;
+  if(current && current.id!==session.user.id)throw new Error('Sesyon an chanje.');
+  if(current){useStore.getState().patchUser(fields);useStore.getState().profileChanged();}
+  const {error}=await client().auth.updateUser({data:fields});
+  if(error)useStore.getState().setSyncIssue('profile',{code:error.code||'',message:error.message});
+  const user={...session.user,user_metadata:{...session.user.user_metadata,...fields}};
   return user;
 }
 
@@ -57,32 +61,34 @@ export async function lookupContact(phone) {
   return data?.[0] || null;
 }
 
-const fields = 'id,sender_id,recipient_id,body,encrypted_body,media_path,media_kind,media_parts,status,created_at,expires_at';
+const fields = 'id,sender_id,recipient_id,body,encrypted_body,media_path,media_kind,media_parts,status,created_at,expires_at,delivered_at,read_at';
 export async function listConversations(userId) {
-  const [messages, peers] = await Promise.all([
-    client().from('messages').select(fields).or(`sender_id.eq.${userId},recipient_id.eq.${userId}`)
-      .eq('status', 'ready').order('created_at', { ascending: false }).limit(500),
-    client().rpc('message_peers'),
-  ]);
-  const names = new Map(requireData(peers).map(p => [p.id, p]));
-  const latest = new Map();
-  requireData(messages).forEach(m => {
-    const id = m.sender_id === userId ? m.recipient_id : m.sender_id;
-    if (!latest.has(id)) latest.set(id, { peer: names.get(id) || { id }, last: m });
-  });
-  return [...latest.values()];
+  const threads=requireData(await client().rpc('chat_threads_list'));
+  return threads.map(row=>({peer:{id:row.id,first_name:row.first_name,last_name:row.last_name},last:row.last||{created_at:row.last_activity},unread:Number(row.unread)}));
 }
-export async function listMessages(userId, peerId, before = null) {
+export async function markMessages(ids,read=false) {
+ if(!ids.length)return;
+ requireData(await client().rpc('mark_messages',{p_ids:ids.slice(0,150),p_read:read}));
+}
+export async function deleteTextMessage(id) { requireData(await client().rpc('delete_text_message',{p_id:id})); }
+
+export async function listMessages(userId, peerId, before = null, decoded = new Map()) {
   let query = client().from('messages').select(fields)
     .or(`and(sender_id.eq.${userId},recipient_id.eq.${peerId}),and(sender_id.eq.${peerId},recipient_id.eq.${userId})`)
     .eq('status','ready').order('created_at', { ascending: false }).order('id', { ascending: false }).limit(50);
   if (before) query = query.lt('created_at', before);
   const rows = requireData(await query);
+  if(useStore.getState().user?.id===userId)rows.filter(m=>m.sender_id===userId&&m.delivered_at).reverse().forEach(m=>useStore.getState().recordDelivery({id:m.id,kind:m.media_kind||'text',ms:Math.max(0,new Date(m.delivered_at).getTime()-new Date(m.created_at).getTime())}));
   return Promise.all(rows.map(async m => {
     if (!m.encrypted_body) return { ...m, legacy: !m.media_parts };
     try {
+      const signature = JSON.stringify([userId,m.sender_id,m.recipient_id,m.encrypted_body]);
+      const cached = decoded.get(m.id);
+      if (cached?.signature === signature) return {...m,body:cached.text};
       const payload = await decryptForSelf(userId, m, m.encrypted_body);
       if (typeof payload.text !== 'string' || !payload.text.length || payload.text.length > 4000) throw new Error('Mesaj modifye.');
+      decoded.set(m.id,{signature,text:payload.text});
+      while(decoded.size>150) decoded.delete(decoded.keys().next().value);
       return { ...m, body: payload.text };
     } catch (e) { return { ...m, body: null, decryptError: e.message }; }
   }));
@@ -91,15 +97,20 @@ export async function sendText(userId, peerId, body) {
   const text = body.trim();
   if (!text) return;
   if (text.length > 4000) throw new Error('Mesaj la twò long.');
+  const timer=transferTimer(userId,'text','send');
   const id = Crypto.randomUUID();
   const envelopes = await encryptForPair(userId, peerId, { id, sender: userId, recipient: peerId, text });
-  return requireData(await client().rpc('send_encrypted_text', { p_id: id, p_peer: peerId, p_envelopes: envelopes }));
+  timer.mark('prepare');
+  const result = requireData(await client().rpc('send_encrypted_text', { p_id: id, p_peer: peerId, p_envelopes: envelopes }));
+  timer.mark('transfer'); timer.finish(new TextEncoder().encode(text).length);
+  return result;
 }
 const requireActive = () => {
   if (AppState.currentState !== 'active' || useStore.getState().isLocked || !useStore.getState().isAuthenticated) throw new Error('Operasyon an kanpe. Ouvri app la ankò.');
 };
 export async function sendMedia(userId, peerId, asset, pin, onProgress = () => {}) {
   requireActive();
+  const timer=transferTimer(userId,asset.type,'send'); onProgress(0,'prepare');
   if (!['image','video','audio'].includes(asset.type)) throw new Error('Fòma sa a pa sipòte.');
   if (asset.type !== 'audio' && !/^\d{6}$/.test(pin || '')) throw new Error('Mete yon kòd 6 chif.');
   const id = Crypto.randomUUID();
@@ -109,6 +120,7 @@ export async function sendMedia(userId, peerId, asset, pin, onProgress = () => {
     p_id: id, p_peer: peerId, p_kind: asset.type, p_parts: manifest.chunks, p_envelopes: envelopes, p_pin: pin || null,
   }));
   await FileSystem.makeDirectoryAsync(privateCache, { intermediates: true });
+  timer.mark('prepare'); onProgress(0,'transfer');
   const uploaded = [];
   let completed = 0;
   try {
@@ -130,11 +142,13 @@ export async function sendMedia(userId, peerId, asset, pin, onProgress = () => {
           'Content-Type': 'application/octet-stream', 'x-upsert': 'false' },
       });
       if (result.status < 200 || result.status >= 300) throw new Error(`Upload echwe (${result.status}).`);
-      onProgress(Math.round(++completed / manifest.chunks * 100));
+      onProgress(Math.round(++completed / manifest.chunks * 100),'transfer');
       } finally { await removePrivateFile(temporary); }
     });
     requireActive();
+    timer.mark('transfer'); onProgress(100,'validate');
     requireData(await client().rpc('finish_encrypted_media', { p_id: id }));
+    timer.finish(manifest.size);
   } catch (error) {
     try {
       if (uploaded.length) requireData(await client().storage.from('chat-media').remove(uploaded));
@@ -160,17 +174,22 @@ export async function authorizeMedia(messageId) {
 }
 export async function openMedia(userId, message, pin, onProgress = () => {}) {
   requireActive();
+  const timer=transferTimer(userId,message.media_kind,'receive'); onProgress(0,'prepare');
   if (!message.media_parts) throw new Error('Ansyen medya sa a pa itilize nouvo pwoteksyon an. Voye li ankò.');
+  const unlockStarted=performance.now();
   const grant = checkAuthorization(requireData(await client().rpc('unlock_media', { p_id: message.id, p_pin: pin || null })));
   const manifest = await decryptForSelf(userId, message, grant.envelopes);
   if (manifest.chunks !== grant.parts || manifest.kind !== message.media_kind) throw new Error('Medya modifye.');
-  let authorization = await authorizeMedia(message.id);
-  let checked = performance.now();
+  // unlock_media already includes a fresh server authorization and server clock.
+  const lifetime=grant.expires_at ? new Date(grant.expires_at).getTime()-new Date(grant.server_now).getTime() : Infinity;
+  let authorization = {...grant,deadline:unlockStarted+lifetime};
+  let checked = unlockStarted;
   const assertAllowed = async () => {
     requireActive();
     if (performance.now() >= authorization.deadline) throw new Error('Medya ekspire.');
     if (performance.now() - checked > 5000) { authorization = await authorizeMedia(message.id); checked = performance.now(); }
   };
+  timer.mark('prepare'); onProgress(0,'transfer');
   let signed = [], signedAt = 0, signing = null, completed = 0;
   const uri = await assemblePrivateFile(manifest, async index => {
     if (!signed[index] || performance.now() - signedAt > 10000) {
@@ -185,16 +204,20 @@ export async function openMedia(userId, message, pin, onProgress = () => {}) {
     }
     const signedUrl = signed[index];
     const temporary = `${privateCache}download-${Crypto.randomUUID()}.bin`;
+    let handedOff = false;
     try {
       const result = await FileSystem.downloadAsync(signedUrl, temporary);
       if (result.status !== 200) throw new Error('Telechajman echwe.');
-      onProgress(Math.round(++completed / manifest.chunks * 100));
+      onProgress(Math.round(++completed / manifest.chunks * 100),'transfer');
+      if(nativeFileCrypto()) { handedOff = true; return {uri:temporary}; }
       return decode(await FileSystem.readAsStringAsync(temporary, { encoding: 'base64' }));
-    } finally { await removePrivateFile(temporary); }
+    } finally { if(!handedOff) await removePrivateFile(temporary); }
   }, assertAllowed, 3);
+  timer.mark('transfer'); onProgress(100,'validate');
   try {
     authorization = await authorizeMedia(message.id);
     requireActive();
+    timer.finish(manifest.size);
     return { uri, message, deadline: authorization.deadline };
   } catch (e) { await removePrivateFile(uri); throw e; }
 }

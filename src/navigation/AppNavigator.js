@@ -1,5 +1,5 @@
 // src/navigation/AppNavigator.js
-import React, { useState } from 'react';
+import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View } from 'react-native';
@@ -8,7 +8,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 
-import SplashScreen from '../screens/SplashScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -38,6 +37,7 @@ function TabIcon({ name, focused }) {
 
 function MainTabs() {
   const { t } = useTranslation();
+  const unread=useStore(s=>s.unread);
   const insets = useSafeAreaInsets();
   const bottom = Math.max(insets.bottom, 10);
   return (
@@ -57,7 +57,7 @@ function MainTabs() {
       <Tab.Screen name="Dashboard" component={DashboardScreen} options={{ tabBarLabel: t('home') }} />
       <Tab.Screen name="Vault" component={VaultScreen} options={{ tabBarLabel: t('vault') }} />
       <Tab.Screen name="Camera" component={CameraScreen} options={{ tabBarLabel: t('camera') }} />
-      <Tab.Screen name="Messages" component={MessagesScreen} options={{ tabBarLabel: t('messages') }} />
+      <Tab.Screen name="Messages" component={MessagesScreen} options={{ tabBarLabel: t('messages'),tabBarBadge:unread?Math.min(unread,99):undefined }} />
       <Tab.Screen name="Settings" component={SettingsScreen} options={{ tabBarLabel: t('settings') }} />
     </Tab.Navigator>
   );
@@ -65,14 +65,6 @@ function MainTabs() {
 
 export default function AppNavigator() {
   const { isAuthenticated, isLocked } = useStore();
-  const [showLockSplash, setShowLockSplash] = useState(true);
-
-  // Play the existing splash once on launch.
-  if (showLockSplash) {
-    return (
-      <SplashScreen onFinish={() => setShowLockSplash(false)} />
-    );
-  }
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>

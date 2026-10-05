@@ -34,7 +34,7 @@ export function useCodePrompt() {
       <Text style={s.title}>{prompt?.title || t('mediaCode')}</Text>
       <Text style={s.hint}>{prompt?.hint || t('codeHint')}</Text>
       <TextInput autoFocus style={s.input} value={pin} onChangeText={v => setPin(v.replace(/\D/g,''))} maxLength={6}
-        keyboardType="number-pad" secureTextEntry={!prompt?.shareOption} placeholder="••••••" placeholderTextColor="#999" accessibilityLabel={t('mediaCode')} />
+        keyboardType="number-pad" secureTextEntry={!prompt?.shareOption} placeholder="••••••" placeholderTextColor="#999" accessibilityLabel={prompt?.title || t('mediaCode')} />
       {prompt?.create && <TextInput style={s.input} value={confirmation} onChangeText={v => setConfirmation(v.replace(/\D/g,''))} maxLength={6}
         keyboardType="number-pad" secureTextEntry={!prompt?.shareOption} placeholder={t('confirmCode')} placeholderTextColor="#999" />}
       {prompt?.shareOption && <>

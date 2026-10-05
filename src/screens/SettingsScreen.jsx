@@ -1,3 +1,5 @@
+import { enableNotifications } from '../services/notifications';
+import { shareProfileWithContacts } from '../services/profileCards';
 import * as ImagePicker from 'expo-image-picker';
 import { saveProfilePhoto, loadProfilePhoto } from '../services/profilePhoto';
 import { removePickerCopy } from '../services/vault';
@@ -6,7 +8,7 @@ import { Alert } from '../components/AppDialog';
 // src/screens/SettingsScreen.jsx
 // ============================================================
 import React, { useState, useEffect } from 'react';
-import { View, Image, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import { View, Image, Text, NativeModules, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { changeAppLanguage } from '../i18n/language';
@@ -22,7 +24,11 @@ const LANGS = [
 
 export function SettingsScreen({ navigation }) {
   const { t } = useTranslation();
-  const { user, language, logout, setUser } = useStore();
+  const { user, language, logout, patchUser } = useStore();
+  const syncIssues = useStore(state=>state.syncIssues);
+  const deliveries=useStore(state=>state.deliveryMetrics);
+  const metrics = useStore(state=>state.transferMetrics);
+  const seconds = value => (value/1000).toFixed(1);
   const locked = useStore(state => state.isLocked);
   const [photo, setPhoto] = useState(null);
   useEffect(() => {
@@ -41,19 +47,23 @@ export function SettingsScreen({ navigation }) {
       asset=result.assets?.[0]; if(result.canceled || !asset)return;
       await saveProfilePhoto(user.id,asset);
       setPhoto(await loadProfilePhoto(user.id));
+      shareProfileWithContacts().catch(e=>useStore.getState().setSyncIssue('profile',{message:e.message}));
     } catch(error) { Alert.alert(t('profile'),error.message); }
     finally { if(asset)await removePickerCopy(asset).catch(()=>{}); setSaving(false); }
   };
   const [edit, setEdit] = useState(false);
   const [form, setForm] = useState({ firstName: user?.firstName || '', name: user?.name || '' });
+  const [notificationStatus,setNotificationStatus]=useState('');
   const [saving, setSaving] = useState(false);
 
   const saveProfile = async () => {
     setSaving(true);
     try {
       const updated = await updateProfile(form);
-      setUser({ ...user, firstName: updated.user_metadata.firstName, name: updated.user_metadata.name,
+      if(useStore.getState().user?.id!==updated.id)return;
+      patchUser({ firstName: updated.user_metadata.firstName, name: updated.user_metadata.name,
         phoneNumber: updated.user_metadata.phoneNumber });
+      shareProfileWithContacts().catch(e=>useStore.getState().setSyncIssue('profile',{message:e.message}));
       setEdit(false);
     } catch (e) { Alert.alert(t('profile'), e.message); }
     finally { setSaving(false); }
@@ -115,6 +125,10 @@ export function SettingsScreen({ navigation }) {
           ))}
         </View>
 
+        <View style={ss.section}><TouchableOpacity style={ss.item} onPress={async()=>{try{setNotificationStatus(await enableNotifications());}catch(e){Alert.alert(t('notifications'),e.message);}}}>
+          <Text style={ss.itemLabel}>{t('enableNotifications')}</Text></TouchableOpacity>
+          {!!notificationStatus&&<Text style={[ss.profileEmail,{padding:14}]}>{t('notifications_'+notificationStatus)}</Text>}
+        </View>
         {/* Security */}
         <View style={ss.section}>
           <Text style={ss.sectionTitle}>{t('security')}</Text>
@@ -123,6 +137,24 @@ export function SettingsScreen({ navigation }) {
             <Text style={ss.itemLabel}>💎 {t('plans')}</Text>
             <Text style={ss.arrow}>→</Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={ss.section}>
+          <Text style={ss.sectionTitle}>Save Me · 1.3</Text>
+          <Text style={[ss.profileEmail,{padding:14}]}>{t(NativeModules.SaveMeCrypto?.decryptFileAppend ? 'cryptoNative' : 'cryptoCompatibility')}</Text>
+          {Object.entries(syncIssues).filter(([,issue])=>issue).map(([kind,issue])=><View key={kind} style={{padding:14}}>
+            <Text style={{color:'#FFB7B7',fontWeight:'700'}}>{t(kind==='identity'?'identitySyncIssue':'profileSyncIssue')}</Text>
+            <Text selectable style={ss.profileEmail}>{issue.code ? `[${issue.code}] ` : ''}{issue.message}</Text>
+          </View>)}
+          <Text style={ss.sectionTitle}>{t('transferDetails')}</Text>
+          <Text style={[ss.profileEmail,{padding:14}]}>{t('transferTimingHint')}</Text>
+          <Text style={[ss.profileEmail,{padding:14}]}>{t('deliveryTimingHint')}</Text>
+          {deliveries.map(metric=><Text key={metric.id} style={[ss.profileEmail,{paddingHorizontal:14,paddingBottom:8}]}>{t(({audio:'voice',image:'photo',video:'video',text:'text'})[metric.kind])} · {t('messageDelivered')}: {seconds(metric.ms)} s</Text>)}
+          {metrics.map((metric,index)=><View key={index} style={{padding:14,borderTopWidth:1,borderTopColor:'#25324A'}}>
+            <Text style={ss.itemLabel}>{t(metric.direction==='send'?'send':'receive')} · {t(({audio:'voice',image:'photo',video:'video',text:'text'})[metric.kind])} · {(metric.bytes/1048576).toFixed(2)} MB</Text>
+            <Text style={ss.profileEmail}>{t('transferTotal')}: {seconds(metric.total)} s</Text>
+            <Text style={ss.profileEmail}>{t('transferPhase_prepare')}: {seconds(metric.prepare)} s · {t('transferPhase_transfer')}: {seconds(metric.transfer)} s · {t('transferPhase_validate')}: {seconds(metric.validate)} s</Text>
+          </View>)}
         </View>
 
         {/* Danger */}

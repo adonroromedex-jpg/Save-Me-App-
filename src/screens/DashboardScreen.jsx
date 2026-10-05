@@ -1,5 +1,6 @@
+import useOwnAvatar from '../hooks/useOwnAvatar';
 import React, { useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Image, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +10,8 @@ import { listVaultFiles } from '../services/vault';
 export default function DashboardScreen({ navigation }) {
   const { t } = useTranslation();
   const { user, files, plan, setFiles } = useStore();
+  const avatar=useOwnAvatar();
+  const unread=useStore(s=>s.unread);
   const initials = user ? `${(user.firstName || 'U')[0]}${(user.name || 'S')[0]}`.toUpperCase() : 'SM';
   const displayName = `${user?.firstName || ''} ${user?.name || ''}`.trim() || t('profile');
   useFocusEffect(useCallback(() => {
@@ -21,7 +24,8 @@ export default function DashboardScreen({ navigation }) {
     <ScrollView contentContainerStyle={s.scroll}>
       <View style={s.header}>
         <View style={{ flex: 1 }}><Text style={s.greeting}>{t('hello')}</Text><Text style={s.name}>{displayName}</Text></View>
-        <View style={s.avatar}><Text style={s.avatarText}>{initials}</Text></View>
+        <TouchableOpacity accessibilityLabel={t('notifications')} onPress={()=>navigation.navigate('Messages')} style={{padding:8}}><Ionicons name="notifications-outline" size={25} color="#D5E7FF" />{!!unread&&<Text style={{position:'absolute',top:0,right:0,color:'#fff',backgroundColor:'#C53859',borderRadius:10,paddingHorizontal:5,fontSize:10}}>{Math.min(unread,99)}</Text>}</TouchableOpacity>
+        <View style={s.avatar}>{avatar?<Image source={{uri:avatar}} style={{width:48,height:48,borderRadius:24}} />:<Text style={s.avatarText}>{initials}</Text>}</View>
       </View>
       <TouchableOpacity style={s.planBadge} onPress={() => navigation.navigate('Plans')} accessibilityRole="button">
         <Ionicons name="diamond-outline" size={19} color="#8FBFFF" />

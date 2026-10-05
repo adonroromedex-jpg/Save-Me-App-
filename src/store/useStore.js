@@ -16,13 +16,29 @@ export const useStore = create((set) => ({
   // Files
   files: [],
 
+  profileRevision: 0,
+  activeChat: null,
+  setActiveChat: activeChat => set({activeChat}),
+  unread: 0,
+  pendingPeer: null,
+  patchUser: fields => set(state => ({user: state.user ? {...state.user,...fields} : null})),
+  profileChanged: () => set(state => ({profileRevision:state.profileRevision+1})),
+  setUnread: unread => set({unread}),
+  openPeer: pendingPeer => set({pendingPeer}),
+  syncIssues: {},
+  deliveryMetrics: [],
+  recordDelivery: metric => set(state => state.deliveryMetrics.some(row=>row.id===metric.id) ? state : {deliveryMetrics:[metric,...state.deliveryMetrics].slice(0,6)}),
+  transferMetrics: [],
+  setSyncIssue: (kind, issue) => set(state => ({syncIssues:{...state.syncIssues,[kind]:issue}})),
+  addTransferMetric: metric => set(state => ({transferMetrics:[metric,...state.transferMetrics].slice(0,6)})),
+
   // Alerts
   alerts: [],
 
   // Actions
   setUser: (user) => set({ user, isAuthenticated: true, isLocked: false }),
   restoreUser: (user) => set({ user, isAuthenticated: true, isLocked: true }),
-  logout: () => set({ user: null, isAuthenticated: false, isLocked: true, files: [], plan: 'free' }),
+  logout: () => set({ user: null, isAuthenticated: false, isLocked: true, files: [], plan: 'free', syncIssues: {}, transferMetrics: [], deliveryMetrics: [], unread:0, pendingPeer:null, activeChat:null }),
   lockApp: () => set({ isLocked: true }),
   unlockApp: () => set({ isLocked: false }),
   setLanguage: (language) => set({ language }),

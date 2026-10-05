@@ -69,6 +69,24 @@ public final class SaveMeCryptoModule extends ReactContextBaseJavaModule {
       finally { if (plain != null) Arrays.fill(plain, (byte) 0); }
     });
   }
+  @ReactMethod public void decryptFileAppend(String source, String target, int length,
+      String key, String nonce, String aad, Promise promise) {
+    workers.execute(() -> {
+      byte[] plain = null;
+      try {
+        if (length < 1 || length > 1048576) throw new IOException("Invalid chunk");
+        File inputFile = file(source);
+        if (inputFile.length() != length + 16) throw new IOException("Incomplete encrypted chunk");
+        byte[] encrypted = new byte[length + 16];
+        try (DataInputStream input = new DataInputStream(new FileInputStream(inputFile))) { input.readFully(encrypted); }
+        plain = cipher(Cipher.DECRYPT_MODE, key, nonce, aad).doFinal(encrypted);
+        if (plain.length != length) throw new IOException("Incomplete chunk");
+        try (FileOutputStream output = new FileOutputStream(file(target), true)) { output.write(plain); }
+        promise.resolve(null);
+      } catch (Exception e) { promise.reject("MEDIA_CRYPTO", "Fichye a pa konplè oswa li modifye.", e); }
+      finally { if (plain != null) Arrays.fill(plain, (byte) 0); }
+    });
+  }
   @ReactMethod public void deriveVaultKey(String pin, String salt, Promise promise) {
     workers.execute(() -> {
       PBEKeySpec spec = null; byte[] derived = null;

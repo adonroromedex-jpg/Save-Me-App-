@@ -24,7 +24,7 @@ test('migration and RLS enforce sender dates, encrypted access, PIN lockout, blo
  create function extensions.gen_salt(text,integer) returns text language sql as $$select 'fixture'::text$$;
  create function extensions.crypt(text,text) returns text language sql as $$select md5($1)$$;
  insert into auth.users(id,email_confirmed_at) values('${a}',now()),('${b}',now()),('${e}',now());`);
- for(const name of ['20260929_secure_messaging.sql','20260929_repair_profiles_and_media_limits.sql','20260929_encrypted_exchange.sql']){
+ for(const name of ['20260929_secure_messaging.sql','20260929_repair_profiles_and_media_limits.sql','20260929_encrypted_exchange.sql','20261004_chat_experience.sql']){
   const sql=fs.readFileSync(`supabase/migrations/${name}`,'utf8').replace('create extension if not exists pgcrypto with schema extensions;','');
   await db.exec(sql);
  }
@@ -42,6 +42,9 @@ test('migration and RLS enforce sender dates, encrypted access, PIN lockout, blo
  await rpc('finish_encrypted_media',[mediaId]);
  const media=(await db.query('select * from messages where id=$1',[mediaId])).rows[0];
  assert.equal(new Date(media.expires_at)-new Date(media.created_at),86400000);
+ assert.equal(await rpc('chat_expiry_warning',[b]),false);
+ await db.exec('reset role');await db.query("update messages set expires_at=now()+interval '59 minutes' where id=$1",[mediaId]);
+ await as(b);assert.equal(await rpc('chat_expiry_warning',[a]),true);await as(a);
  await assert.rejects(db.query('select * from media_secrets'),/permission denied/);
  await as(e);assert.equal((await db.query('select * from messages')).rows.length,0);assert.equal((await rpc('unlock_media',[mediaId,'123456'])).error,'expired');
  assert.equal((await db.query('select * from storage.objects')).rows.length,0);
@@ -64,7 +67,22 @@ test('migration and RLS enforce sender dates, encrypted access, PIN lockout, blo
  assert.equal((await db.query('select * from messages where id=$1',[mediaId])).rows.length,0);
  assert.equal((await db.query('select * from storage.objects where name=$1',[`${path}/0.bin`])).rows.length,0);
  assert.equal((await db.query('select * from messages')).rows.length,2,'text and voice survive photo expiry');
+ await as(a);await rpc('mark_messages',[[textId],true]);
+ assert.equal((await db.query('select read_at from messages where id=$1',[textId])).rows[0].read_at,null,'sender cannot forge read');
+ await as(b);await rpc('mark_messages',[[textId],false]);
+ assert.ok((await db.query('select delivered_at from messages where id=$1',[textId])).rows[0].delivered_at);
+ await rpc('mark_messages',[[textId],true]);assert.ok((await db.query('select read_at from messages where id=$1',[textId])).rows[0].read_at);
+ await assert.rejects(rpc('delete_text_message',[textId]),/Only your own/);
+ await as(a);await assert.rejects(rpc('delete_text_message',[voiceId]),/Only your own/);
+ await rpc('set_chat_profile',[b,envelopes]);
+ await as(e);assert.equal((await db.query('select * from chat_profile_cards')).rows.length,0);
+ await as(b);assert.equal((await db.query('select * from chat_profile_cards')).rows.length,1);
+ await as(a);await rpc('delete_text_message',[textId]);
+ const threads=await rpc('chat_threads_list');assert.equal(threads.length,1);assert.equal(threads[0].id,b,'one persistent conversation per account pair');
+ await assert.rejects(db.query('select * from push_devices'),/permission denied/);
+ await rpc('register_push',['ExpoPushToken[fixture]']);await rpc('unregister_push');
  await db.exec('reset role');
  await db.exec(fs.readFileSync('supabase/migrations/20260929_encrypted_exchange.sql','utf8').replace('create extension if not exists pgcrypto with schema extensions;',''));
+ await db.exec(fs.readFileSync('supabase/migrations/20261004_chat_experience.sql','utf8'));
  }finally{await db.close();}
 });

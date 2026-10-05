@@ -2,7 +2,7 @@
   "expo": {
     "name": "Save Me",
     "slug": "save-me-secure",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/icon_white.png",
     "userInterfaceStyle": "dark",
@@ -32,7 +32,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.saveme.secure",
-      "versionCode": 3,
+      "versionCode": 4,
       "compileSdkVersion": 34,
       "targetSdkVersion": 34,
       "minSdkVersion": 24,
@@ -67,7 +67,15 @@
           "microphonePermission": "Allow Save Me to record secure voice messages."
         }
       ],
-      "./plugins/withSaveMeCrypto"
+      "./plugins/withSaveMeCrypto",
+      [
+        "expo-notifications",
+        {
+          "color": "#104A91",
+          "defaultChannel": "messages",
+          "icon": "./assets/notification-icon.png"
+        }
+      ]
     ],
     "extra": {
       "eas": {

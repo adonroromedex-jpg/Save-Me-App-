@@ -1,3 +1,6 @@
+import useOwnAvatar from '../hooks/useOwnAvatar';
+import { shareProfile, peerProfilePhoto } from '../services/profileCards';
+import { getSupabaseClient } from '../services/supabase';
 import { Alert } from '../components/AppDialog';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { filterPhoneContacts, isPhoneQuery } from '../utils/contactSearch';
@@ -12,7 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
-import { listConversations, listMessages, lookupContact, openMedia, authorizeMedia, normalizePhone, sendMedia, sendText, setContactBlocked } from '../services/messages';
+import { listConversations, listMessages, lookupContact, openMedia, authorizeMedia, normalizePhone, sendMedia, sendText, setContactBlocked, markMessages, deleteTextMessage } from '../services/messages';
 import { securityNumbers } from '../services/identity';
 import { removePickerCopy } from '../services/vault';
 import { removePrivateFile } from '../services/privateFiles';
@@ -23,16 +26,33 @@ const colors = ['#1565C0','#4B3781','#17655D','#7F3546'];
 export default function MessagesScreen({ navigation }) {
   const { t } = useTranslation();
   const user = useStore(s => s.user);
+  const ownAvatar=useOwnAvatar(),pendingPeer=useStore(s=>s.pendingPeer);
+  const [peerAvatar,setPeerAvatar]=useState(null),[hasSent,setHasSent]=useState(false),[expirySoon,setExpirySoon]=useState(false);
+  const introKey=id=>`chat-intro-sent-${user.id}-${id}`;
+  const noteSent=async()=>{setHasSent(true);if(peerRef.current)await AsyncStorage.setItem(introKey(peerRef.current.id),'1').catch(()=>{});};
+
   const { askCode, codeModal } = useCodePrompt();
   const [menuOpen,setMenuOpen] = useState(false);
   const [peer,setPeer] = useState(null), [mode,setMode] = useState('list');
   const [conversations,setConversations] = useState([]), [messages,setMessages] = useState([]), [contacts,setContacts] = useState([]);
   const [contactQuery,setContactQuery] = useState(''), [contactsLoaded,setContactsLoaded] = useState(false), [contactError,setContactError] = useState(''), [input,setInput] = useState('');
-  const [busy,setBusy] = useState(false), [error,setError] = useState(''), [progress,setProgress] = useState(null);
+  const [busy,setBusy] = useState(false), [error,setError] = useState(''), [progress,updateProgress] = useState(null);
   const [preview,setPreview] = useState(null), [recording,setRecording] = useState(false), [voice,setVoice] = useState(null);
+  const [phase,setPhase] = useState('prepare');
+  const setProgress = (value,stage) => {updateProgress(value);if(stage)setPhase(stage);};
+  const [audioStatus,setAudioStatus] = useState({});
   const [seconds,setSeconds] = useState(0), [color,setColor] = useState(colors[0]), [loadingOlder,setLoadingOlder] = useState(false);
   const peerRef = useRef(null), previewRef = useRef(null), recordingRef = useRef(null), voiceRef = useRef(null), soundRef = useRef(null);
   const alive = useRef(true), focused = useRef(false), operation = useRef(0), refreshing = useRef(false);
+  const decoded = useRef(new Map());
+  const readRequests=useRef(new Set());
+  const viewability=useRef({itemVisiblePercentThreshold:70,minimumViewTime:700}).current;
+  const onVisible=useRef(({viewableItems})=>{
+    if(!focused.current || AppState.currentState!=='active')return;
+    const ids=viewableItems.map(v=>v.item).filter(m=>m.recipient_id===user.id&&!m.read_at&&!m.media_kind&&m.body&&!m.decryptError&&!readRequests.current.has(m.id)).map(m=>m.id);
+    ids.forEach(id=>readRequests.current.add(id));
+    markMessages(ids,true).catch(()=>ids.forEach(id=>readRequests.current.delete(id)));
+  }).current;
   const themeKey = person => `chat-theme-${user.id}-${person.id}`;
   const stopSound = useCallback(async () => { const sound=soundRef.current; soundRef.current=null; if(sound) await sound.unloadAsync().catch(()=>{}); },[]);
   const closePreview = useCallback(() => {
@@ -55,12 +75,14 @@ export default function MessagesScreen({ navigation }) {
     const target=peerRef.current?.id;
     try {
       if(target) {
-        const rows=await listMessages(user.id,target);
-        if(alive.current && peerRef.current?.id===target && focused.current) setMessages(current=>{
+        const rows=await listMessages(user.id,target,null,decoded.current);
+        if(alive.current && peerRef.current?.id===target && focused.current) {
+          setMessages(current=>{
           const cutoff=rows[rows.length-1]?.created_at;
           const older=cutoff?current.filter(m=>m.created_at<cutoff && (!m.expires_at || new Date(m.expires_at).getTime()>Date.now())):[];
           return [...rows,...older];
         });
+        }
       } else {
         const rows=await listConversations(user.id);
         if(alive.current && !peerRef.current && focused.current) setConversations(rows);
@@ -70,12 +92,12 @@ export default function MessagesScreen({ navigation }) {
     finally { refreshing.current=false; }
   },[user?.id]);
   useFocusEffect(useCallback(()=>{
-    focused.current=true; refresh(); const timer=setInterval(refresh,8000);
-    return ()=>{ focused.current=false; operation.current++; clearInterval(timer); closePreview(); abortRecording(); discardVoice(); };
+    focused.current=true; useStore.getState().setActiveChat(peerRef.current?.id||null); refresh(); const timer=setInterval(refresh,2000);
+    return ()=>{ focused.current=false; useStore.getState().setActiveChat(null); decoded.current=new Map(); operation.current++; clearInterval(timer); closePreview(); abortRecording(); discardVoice(); };
   },[refresh,closePreview,abortRecording,discardVoice]));
   useEffect(()=>{
     alive.current=true;
-    const sub=AppState.addEventListener('change',state=>{if(state!=='active'){operation.current++;closePreview();abortRecording();discardVoice();}});
+    const sub=AppState.addEventListener('change',state=>{if(state!=='active'){decoded.current=new Map();operation.current++;closePreview();abortRecording();discardVoice();}});
     return ()=>{alive.current=false;operation.current++;sub.remove();};
   },[closePreview,abortRecording,discardVoice]);
   useEffect(()=>{
@@ -94,11 +116,43 @@ export default function MessagesScreen({ navigation }) {
 
   const openChat=person=>{
     operation.current++;closePreview();discardVoice();abortRecording();
+    decoded.current=new Map();
+    setPeerAvatar(null);setHasSent(false);
+    useStore.getState().setActiveChat(person.id);
+    AsyncStorage.getItem(introKey(person.id)).then(value=>{if(peerRef.current?.id===person.id&&value==='1')setHasSent(true);});
+    shareProfile(person.id).catch(()=>{});
+    peerProfilePhoto(user.id,person.id).then(photo=>{if(peerRef.current?.id===person.id)setPeerAvatar(photo);}).catch(()=>{});
     peerRef.current=person;setPeer(person);setMode('chat');setMessages([]);setInput('');setError('');
     setColor(colors[0]);AsyncStorage.getItem(themeKey(person)).then(v=>{if(v && peerRef.current?.id===person.id)setColor(v);});
-    listMessages(user.id,person.id).then(rows=>{if(peerRef.current?.id===person.id && alive.current)setMessages(rows);}).catch(e=>setError(e.message));
+    listMessages(user.id,person.id,null,decoded.current).then(rows=>{if(peerRef.current?.id===person.id && alive.current){setMessages(rows);if(rows.some(m=>m.sender_id===user.id))setHasSent(true);}}).catch(e=>setError(e.message));
   };
-  const back=()=>{operation.current++;closePreview();discardVoice();abortRecording();peerRef.current=null;setPeer(null);setMode('list');setInput('');refresh();};
+  useEffect(()=>{
+    if(!user?.id)return;
+    const db=getSupabaseClient();const channel=db.channel(`chat-${user.id}`)
+      .on('postgres_changes',{event:'*',schema:'public',table:'messages',filter:`sender_id=eq.${user.id}`},refresh)
+      .on('postgres_changes',{event:'*',schema:'public',table:'messages',filter:`recipient_id=eq.${user.id}`},refresh).subscribe();
+    return()=>{db.removeChannel(channel);};
+  },[user?.id,refresh]);
+  useEffect(()=>{
+    if(!pendingPeer || !user?.id)return;
+    let active=true;
+    listConversations(user.id).then(rows=>{if(!active)return;const match=rows.find(row=>row.peer.id===pendingPeer);if(match){openChat(match.peer);useStore.getState().openPeer(null);}}).catch(()=>{});
+    return()=>{active=false;};
+  },[pendingPeer,user?.id]);
+  const deleteText=message=>{
+    if(message.media_kind || message.sender_id!==user.id)return;
+    Alert.alert(t('deleteText'),t('deleteTextConfirm'),[{text:t('cancel'),style:'cancel'},{text:t('deleteText'),style:'destructive',onPress:async()=>{
+      try{await deleteTextMessage(message.id);decoded.current.delete(message.id);setMessages(rows=>rows.filter(row=>row.id!==message.id));}catch(e){Alert.alert(t('messages'),e.message);}
+    }}]);
+  };
+  useEffect(()=>{
+    if(!peer?.id){setExpirySoon(false);return;}
+    let active=true;const check=async()=>{if(AppState.currentState!=='active')return;const {data,error}=await getSupabaseClient().rpc('chat_expiry_warning',{p_peer:peer.id});if(active&&!error)setExpirySoon(!!data);};
+    setExpirySoon(false);check();const timer=setInterval(check,30000);
+    const avatarTimer=setInterval(()=>{if(AppState.currentState==='active'){peerProfilePhoto(user.id,peer.id).then(photo=>{if(active)setPeerAvatar(photo);}).catch(()=>{});listConversations(user.id).then(rows=>{const next=rows.find(row=>row.peer.id===peer.id)?.peer;if(active&&next)setPeer(next);}).catch(()=>{});}},30000);
+    return()=>{active=false;clearInterval(timer);clearInterval(avatarTimer);};
+  },[peer?.id,user?.id]);
+  const back=()=>{useStore.getState().setActiveChat(null);operation.current++;closePreview();discardVoice();abortRecording();peerRef.current=null;setPeer(null);setMode('list');setInput('');refresh();};
   useFocusEffect(useCallback(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       if (menuOpen || preview) return false;
@@ -141,7 +195,7 @@ export default function MessagesScreen({ navigation }) {
   };
   const submitText=async()=>{
     if(!input.trim() || busy || !peer)return;setBusy(true);
-    try{await sendText(user.id,peer.id,input);setInput('');await refresh();}catch(e){Alert.alert(t('messages'),e.message);}finally{setBusy(false);}
+    try{await sendText(user.id,peer.id,input);await noteSent();setInput('');await refresh();}catch(e){Alert.alert(t('messages'),e.message);}finally{setBusy(false);}
   };
   const pickMedia=async()=>{
     if(busy)return;
@@ -151,7 +205,7 @@ export default function MessagesScreen({ navigation }) {
     const asset=result.assets[0];setBusy(true);
     try{
       const code=await askCode({create:true,shareOption:true});if(!code)return;
-      await sendMedia(user.id,peer.id,asset,code.pin,setProgress);
+      await sendMedia(user.id,peer.id,asset,code.pin,setProgress);await noteSent();
       if(code.share)try{await sendText(user.id,peer.id,t('sentCode',{code:code.pin}));}catch{Alert.alert(t('messages'),t('sendFailedCode'));}
       await refresh();
     }catch(e){Alert.alert(t('messages'),e.message);}finally{await removePickerCopy(asset).catch(()=>{});setBusy(false);setProgress(null);}
@@ -168,11 +222,13 @@ export default function MessagesScreen({ navigation }) {
       const result=await openMedia(user.id,message,code.pin,setProgress);
       if(token!==operation.current || !alive.current || !focused.current){await removePrivateFile(result.uri);return;}
       previewRef.current=result;setPreview(result);
+      if(message.media_kind==='audio') await play(result.uri);
+      if(message.recipient_id===user.id)await markMessages([message.id],true);
     }catch(e){Alert.alert(t('messages'),e.message);await refresh();}finally{setBusy(false);setProgress(null);}
   };
   const play=async uri=>{
     await stopSound();await Audio.setAudioModeAsync({allowsRecordingIOS:false,playsInSilentModeIOS:true,staysActiveInBackground:false});
-    const {sound}=await Audio.Sound.createAsync({uri},{shouldPlay:true});
+    const {sound}=await Audio.Sound.createAsync({uri},{shouldPlay:true,progressUpdateIntervalMillis:250},status=>{if(alive.current)setAudioStatus(status);});
     if(!alive.current || !focused.current || AppState.currentState!=='active'){await sound.unloadAsync();return;}
     soundRef.current=sound;
   };
@@ -182,7 +238,11 @@ export default function MessagesScreen({ navigation }) {
       const permission=await Audio.requestPermissionsAsync();if(!permission.granted)throw new Error(t('microphonePermission'));
       await Audio.setAudioModeAsync({allowsRecordingIOS:true,playsInSilentModeIOS:true,staysActiveInBackground:false});
       const recorder=new Audio.Recording();recordingRef.current=recorder;
-      await recorder.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recorder.prepareToRecordAsync({
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        android:{...Audio.RecordingOptionsPresets.HIGH_QUALITY.android,sampleRate:24000,numberOfChannels:1,bitRate:48000},
+        ios:{...Audio.RecordingOptionsPresets.HIGH_QUALITY.ios,sampleRate:24000,numberOfChannels:1,bitRate:48000},
+      });
       if(!focused.current || AppState.currentState!=='active'){await abortRecording();return;}
       recorder.setOnRecordingStatusUpdate(status=>{setSeconds(Math.floor(status.durationMillis/1000));});
       await recorder.startAsync();setSeconds(0);setRecording(true);
@@ -198,7 +258,7 @@ export default function MessagesScreen({ navigation }) {
   useEffect(()=>{if(recording && seconds>=180)stopVoice();},[seconds,recording]);
   const sendVoice=async()=>{
     if(!voice || busy)return;setBusy(true);
-    try{await stopSound();await sendMedia(user.id,peer.id,voice,null,setProgress);await discardVoice();await refresh();}
+    try{await stopSound();await sendMedia(user.id,peer.id,voice,null,setProgress);await noteSent();await discardVoice();await refresh();}
     catch(e){Alert.alert(t('voice'),e.message);}finally{setBusy(false);setProgress(null);}
   };
   const menu=()=>setMenuOpen(true);
@@ -225,7 +285,7 @@ export default function MessagesScreen({ navigation }) {
       {mode==='chat' && <TouchableOpacity onPress={menu} accessibilityLabel={t('chatMenu')}><Text style={s.link}>•••</Text></TouchableOpacity>}
     </View>
     {!!error && <Text style={s.error}>{error}</Text>}
-    {busy && <View style={s.inputRow}><ActivityIndicator color="#82B9FF" />{progress!==null && <Text style={s.sub}>{progress}%</Text>}</View>}
+    {busy && <View style={s.inputRow}><ActivityIndicator color="#82B9FF" />{progress!==null && <Text style={s.sub}>{t('transferPhase_'+phase)} · {progress}%</Text>}</View>}
     {mode==='list' && <>
       <FlatList data={conversations} keyExtractor={r=>r.peer.id} onRefresh={refresh} refreshing={false} ListEmptyComponent={<Text style={s.empty}>{t('noConversations')}</Text>}
         renderItem={({item})=><TouchableOpacity style={s.row} onPress={()=>openChat(item.peer)}><Text style={s.person}>{label(item.peer)}</Text><Text style={s.sub}>🔒 {item.last.media_kind?kindLabel(item.last.media_kind):t('encryptedMessage')}</Text></TouchableOpacity>} />
@@ -253,14 +313,20 @@ export default function MessagesScreen({ navigation }) {
     </>}
 
     {mode==='chat' && <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
-      <Text style={s.hint}>{t('chatExpiry')}</Text>
-      <FlatList inverted data={messages} keyExtractor={m=>m.id} contentContainerStyle={[s.messages,{justifyContent:'flex-start'}]} keyboardShouldPersistTaps="handled"
+      {expirySoon?<Text style={s.hint}>{t('expirySoon')}</Text>:!hasSent&&<Text style={s.hint}>{t('chatExpiry')}</Text>}
+      <FlatList inverted onViewableItemsChanged={onVisible} viewabilityConfig={viewability} data={messages} keyExtractor={m=>m.id} contentContainerStyle={[s.messages,{justifyContent:'flex-start'}]} keyboardShouldPersistTaps="handled"
         ListFooterComponent={messages.length>=50?<TouchableOpacity onPress={older} disabled={loadingOlder}><Text style={s.hint}>{t('olderMessages')}</Text></TouchableOpacity>:null}
-        renderItem={({item})=><TouchableOpacity disabled={!item.media_path || busy} onPress={()=>viewMedia(item)} style={[s.bubble,item.sender_id===user.id?[s.mine,{backgroundColor:color}]:s.theirs]}>
+        renderItem={({item})=><TouchableOpacity disabled={busy} onLongPress={()=>deleteText(item)} onPress={()=>{if(item.media_path)viewMedia(item);}} style={[s.bubble,item.sender_id===user.id?[s.mine,{backgroundColor:color}]:s.theirs]}>
+          {item.media_kind==='audio' && <View style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:8}}>
+            {(item.sender_id===user.id?ownAvatar:peerAvatar)?<Image source={{uri:item.sender_id===user.id?ownAvatar:peerAvatar}} style={{width:36,height:36,borderRadius:18}} />:<View style={{width:36,height:36,borderRadius:18,backgroundColor:'#254766',alignItems:'center',justifyContent:'center'}}><Text style={s.message}>{item.sender_id===user.id?`${user.firstName?.[0]||''}${user.name?.[0]||''}`:`${peer.first_name?.[0]||''}${peer.last_name?.[0]||''}`}</Text></View>}
+            <Ionicons name="play-circle" size={38} color="#FFFFFF" /><Text style={s.message}>{t('listen')}</Text>
+          </View>}
           <Text style={s.message}>{item.decryptError || item.body || `🔒 ${kindLabel(item.media_kind)}`}</Text>
           {item.legacy && <Text style={s.time}>{t('legacyMessage')}</Text>}
           {!!item.expires_at && <Text style={s.time}>{expiryLabel(item)}</Text>}
-          <Text style={s.time}>{new Date(item.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</Text>
+          <View style={{flexDirection:'row',alignItems:'center',gap:7}}><Text style={s.time}>{new Date(item.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</Text>
+            {item.sender_id===user.id&&<Ionicons name={item.delivered_at?'checkmark-done':'checkmark'} size={17} color={item.read_at?'#58DBFF':'#B3BBC8'} accessibilityLabel={t(item.read_at?'messageRead':item.delivered_at?'messageDelivered':'messageSent')} />}
+          </View>
         </TouchableOpacity>} />
       {recording?<View style={s.recordingCard}>
         <View style={s.inputRow}><View style={s.recordingIcon}><Ionicons name="mic" size={28} color="#FFFFFF" /></View>
@@ -282,7 +348,17 @@ export default function MessagesScreen({ navigation }) {
     </KeyboardAvoidingView>}
     <SecureOverlay visible={!!preview} onRequestClose={closePreview} animationType="fade"><View style={s.viewer}>
       <TouchableOpacity style={s.close} onPress={closePreview}><Text style={s.link}>✕ {t('close')}</Text></TouchableOpacity>
-      {preview?.message.media_kind==='audio'?<TouchableOpacity style={s.action} onPress={()=>play(preview.uri).catch(e=>setError(e.message))}><Text style={s.actionText}>▶ {t('listen')}</Text></TouchableOpacity>
+      {preview?.message.media_kind==='audio'?<View style={{alignItems:'center',padding:24,gap:16}}>
+        <Ionicons name="mic" size={48} color="#93C5FD" /><Text style={s.message}>{t('voice')}</Text>
+        <Text style={s.hint}>{t('voiceAutoDecrypt')}</Text>
+        <TouchableOpacity accessibilityLabel={t('listen')} style={s.action} onPress={async()=>{try{
+          if(audioStatus.isPlaying)await soundRef.current?.pauseAsync();
+          else if(soundRef.current){if(audioStatus.didJustFinish)await soundRef.current.replayAsync();else await soundRef.current.playAsync();}else await play(preview.uri);
+        }catch(e){Alert.alert(t('voice'),e.message);}}}>
+          <Ionicons name={audioStatus.isPlaying?'pause-circle':'play-circle'} size={64} color="#FFFFFF" />
+        </TouchableOpacity>
+        <Text style={s.message}>{Math.floor((audioStatus.positionMillis||0)/1000)} / {Math.floor((audioStatus.durationMillis||0)/1000)}s</Text>
+      </View>
       :preview?.message.media_kind==='video'?<PrivateVideo uri={preview.uri} />
       :preview && <Image source={{uri:preview.uri}} style={s.media} resizeMode="contain" />}
       <Text style={s.hint}>{t('chatExpiry')}</Text>

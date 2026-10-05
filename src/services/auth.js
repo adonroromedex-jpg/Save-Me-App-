@@ -1,3 +1,4 @@
+import { disableAccountNotifications } from './notifications';
 import { getSupabaseClient } from './supabase';
 
 export function publicUser(user) {
@@ -38,6 +39,7 @@ export async function verifyEmailCode(email, code) {
 }
 
 export async function signOutAccount() {
+  await disableAccountNotifications();
   const { error } = await getSupabaseClient().auth.signOut();
   if (error) throw error;
 }

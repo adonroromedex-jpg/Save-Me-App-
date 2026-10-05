@@ -39,3 +39,6 @@ netlify.toml
 pnpm-lock.yaml
 
 dist-exchange/
+
+# Firebase client config is supplied locally for notification-enabled builds.
+google-services.json

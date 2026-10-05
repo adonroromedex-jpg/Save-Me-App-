@@ -5,6 +5,7 @@ import * as Crypto from 'expo-crypto';
 import { CHUNK_BYTES, encode, decode, encryptChunk, decryptChunk, chunkNonce, context } from './cryptoCore';
 import { MAX_MEDIA_BYTES, MEDIA_LIMIT_LABEL } from './mediaLimits';
 
+export const nativeFileCrypto = () => !!NativeModules.SaveMeCrypto?.decryptFileAppend;
 export const pathOnly = uri => uri.replace(/^file:\/\//, '');
 export const privateCache = `${FileSystem.cacheDirectory}save-me-private/`;
 export async function prepareManifest(asset, id = Crypto.randomUUID()) {
@@ -39,12 +40,19 @@ export async function assemblePrivateFile(manifest, fetchPart, checkActive = asy
       await checkActive();
       // Drain every request before cleanup and retain at most three encrypted chunks.
       const results = await Promise.allSettled(Array.from({length: Math.min(prefetch, manifest.chunks-start)}, (_,n) => fetchPart(start+n)));
+      try {
       const failed = results.find(result => result.status === 'rejected');
       if (failed) throw failed.reason;
       for (let n = 0; n < results.length; n++) {
         const index = start+n, cipher = results[n].value;
         await checkActive();
-        if (NativeModules.SaveMeCrypto) {
+        if (cipher?.uri) {
+          if (!cipher.uri.startsWith(privateCache)) throw new Error('Invalid private chunk');
+          await NativeModules.SaveMeCrypto.decryptFileAppend(cipher.uri, output,
+            Math.min(CHUNK_BYTES, manifest.size - index * CHUNK_BYTES), manifest.key,
+            encode(chunkNonce(manifest.prefix,index)), encode(context(manifest,index)));
+          await removePrivateFile(cipher.uri);
+        } else if (NativeModules.SaveMeCrypto) {
           await NativeModules.SaveMeCrypto.decryptAppend(encode(cipher), output,
             Math.min(CHUNK_BYTES, manifest.size - index * CHUNK_BYTES), manifest.key,
             encode(chunkNonce(manifest.prefix,index)), encode(context(manifest,index)));
@@ -56,6 +64,9 @@ export async function assemblePrivateFile(manifest, fetchPart, checkActive = asy
           } finally { plain.fill(0); }
         }
         results[n].value = null;
+      }
+      } finally {
+        await Promise.all(results.filter(r => r.status === 'fulfilled' && r.value?.uri).map(r => removePrivateFile(r.value.uri)));
       }
     }
     await checkActive();

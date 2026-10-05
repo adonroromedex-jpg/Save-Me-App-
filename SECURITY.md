@@ -38,3 +38,11 @@ Phone ownership is not verified. Do not equate phone lookup with identity authen
 Android uses platform AES/GCM/NoPadding with a 128-bit tag and the same 96-bit per-chunk nonce/AAD as v2. PBKDF2-HMAC-SHA256 remains 210,000 iterations (native on Android 26+). Chunk plaintext is authenticated before append; native buffers are cleared in finally blocks. Crypto work uses two worker threads and uploads at most three requests. Failed upload workers drain before cleanup. JS fallback and legacy vault readers remain. Native code is installed by the checked-in Expo config plugin, not an external dependency.
 
 Profile photos are an explicitly local-only feature, encrypted with a random SecureStore key. They are rendered from memory rather than exported plaintext files. As with other JS strings, immediate erasure of in-memory base64 cannot be guaranteed. Names can change; phone/email editing is removed from the app, which is not a server-wide prohibition on a separately authorized Auth API email change.
+
+### Exchange 1.3
+
+Direct-file native decrypt authenticates each complete AES-GCM chunk before append; app-private path restrictions and cleanup remain. Delivery/read times are stamped by the server for the recipient only. Text deletion is sender-only and rejects all media. Text read receipts rely on client viewability (70%/700 ms), not merely fetching history. A compromised client can still assert its own read status.
+
+Profile photos are no longer local-only: the requested small thumbnail is stored in authenticated NaCl envelopes for each selected chat peer. SQL and RLS restrict card access; ciphertext is not public. Full gallery photos are not included in cards. One profile card can persist after photo/video chat expiry because it is profile data, not expiring chat media.
+
+Push metadata consists of account routing IDs and generic text; it excludes message bodies, PINs and encryption keys. Push provider acceptance is not delivery. Thread/receipt metadata and profile cards persist until account deletion. These changes require the new SQL migration; they are not installed by building an APK.

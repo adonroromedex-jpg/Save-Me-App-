@@ -1,16 +1,22 @@
-# Save Me — Exchange 1.2
+# Save Me — Exchange 1.3
 
 Android-first Expo SDK 51 test version. This is a development build, not an audited security product.
 
-## Exchange 1.2 — performance and interface
+## Exchange 1.3 — chat, delivery and profile fixes
 
-Android AES-GCM chunk encryption/decryption and vault PBKDF2 now run in a bounded native worker pool. Imports read file offsets directly instead of copying plaintext through base64 on the JS/UI thread. The v2 format and 210,000 PBKDF2 iterations remain unchanged. Android 24–25 and platforms without the module retain the JS KDF; the JS media implementation remains a compatibility fallback for old builds/iOS.
+**Apply `supabase/migrations/20261004_chat_experience.sql` before using this update. A new native Android build is required.** Existing ciphertext and vault keys keep their format. Do not uninstall or clear app data.
 
-Chat uploads use at most three simultaneous requests, wait for in-flight work before failure cleanup, and fetch the session once per transfer. Downloads prefetch at most three encrypted chunks, request signed URLs in short-lived groups, and authenticate/append plaintext in order. Vault/camera imports show progress. No compression or bandwidth guarantee is claimed: large original videos still depend on connection speed. Measure with a release build on real devices; device timings have not been measured here.
+- Splash starts before profile/network synchronization, with large Welcome and small SaveMe please in a three-second animation. Diagnostic strips are removed; version/native crypto status and exact sync errors are in Settings.
+- Android downloads decrypt directly from temporary encrypted files instead of base64 roundtrips. Three chunks remain the concurrency limit. One redundant authorization request is removed; the code gate, server-clock expiry, final online authorization and five-second viewer checks remain.
+- Foreground chat refresh uses Realtime when available and a two-second polling fallback. Unchanged text is not decrypted repeatedly; the in-memory cache is dropped on background/blur. Voice recordings use mono AAC 48 kb/s rather than the previous stereo high-quality preset, and have an explicit Play control and automatic decryption (no media PIN, as specified for voice).
+- Settings displays actual session transfer timings (preparation, transfer plus crypto, final verification, total). These are measured durations, not estimates or cross-device delivery-time guarantees.
+- Profile names are synchronized from the canonical profile row; Home and voice bubbles show the profile photo. A 96-pixel thumbnail is stored encrypted locally and shared in pair-encrypted profile cards; full photos are not published. Names/avatars from another already-open conversation may take up to its profile refresh interval to update.
+- Persistent server threads survive media expiry, text deletion, logout and login. There is one thread per pair of account IDs, independent of duplicate address-book entries. Separate accounts/identities are NOT merged by matching names or phone numbers. Already expired/deleted media is not restored.
+- A gray single check means the server accepted the send; gray double checks mean the recipient app acknowledged arrival; blue double checks mean visible decrypted text, or opened media. Receipts are recipient-only server operations. Long-press an own text to delete it for both parties; media deletion is rejected by the server.
+- The introductory 24-hour notice hides after the user's first send. A server-time warning returns when any photo/video in the conversation has under one hour remaining; checked every 30 seconds.
+- Notification permission, Home bell, tab badge, local notices, push registration and an outbox worker are implemented. **Closed-app push still requires EAS/FCM and server deployment.** See [NOTIFICATIONS_SETUP.md](NOTIFICATIONS_SETUP.md). Email is the only configured OTP channel.
 
-Registration has one international phone field. Settings edits names and a local encrypted profile picture; phone and email are read-only in this app. Existing saved profile numbers take precedence over new metadata. This is an application restriction, not a new server-wide Auth email-change policy. The profile picture is local only, not shared with contacts. Voice recording has a contrasting microphone/timer panel. App dialogs use styled overlays inside the protected Activity window.
-
-**A new Android build is required.** The Expo config plugin installs the native crypto module during prebuild, including clean prebuilds. No new SQL or Edge Function deployment is needed beyond Exchange 1. The marker is **SAVE ME • EXCHANGE 1.2** (translated). The refreshed blue/red welcome artwork is integrated. Live text reads “Welcome” in large type and “SaveMe please” in small type, fading in for 1.8 seconds within a three-second splash after image load. Original splash audio remains unavailable.
+The vault has ONE personal six-digit code for all its local files, distinct from per-media chat codes. Forgetting it cannot be fixed by entering a new arbitrary code; no recovery/reset that destroys existing files is provided.
 
 ## What this version does
 
@@ -33,7 +39,7 @@ For an existing installation that already ran the initial chat migration:
 3. Replace and redeploy the existing [`cleanup-expired-media`](supabase/functions/cleanup-expired-media/index.ts) Edge Function. Keep the existing five-minute Cron schedule and Vault secret. The new function deletes all chunks before deleting their parent message. Using the old cleanup function would leave orphaned chunks.
 4. Verify the project's global Storage upload limit is at least 2 MiB. The new migration configures the private bucket for encrypted chunks of up to 2 MiB. Do not run the old media-limit migration again after it.
 
-For a brand-new database, first run `20260929_secure_messaging.sql` once, then the two migrations above in order. Review names against any unrelated existing schema before execution.
+For a brand-new database, first run `20260929_secure_messaging.sql` once, then the two migrations above and `20261004_chat_experience.sql` in order. Review names against any unrelated existing schema before execution.
 
 No SQL or Edge Function deployment is performed by the mobile build. Access expiry is server-enforced; physical deletion follows the scheduled cleanup, normally within the Cron interval. Offline/terminated devices clear their temporary copies on next launch; exact physical erasure on such a device cannot be guaranteed.
 
@@ -41,7 +47,7 @@ No SQL or Edge Function deployment is performed by the mobile build. Access expi
 
 Keep `.env` local with `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Never put a service-role key in the app.
 
-After successfully pulling `restore-uploaded-app`, run:
+After successfully pulling `restore-uploaded-app` and applying the new SQL migration, run (or use `scripts/update-two-phones.ps1` for the two Samsung devices):
 
 ```powershell
 npm ci
@@ -49,7 +55,7 @@ npx expo prebuild --platform android --no-install
 npx expo run:android --variant release --device
 ```
 
-Stop if a command fails. A Metro reload is insufficient: this update includes a new native file module, icon and permissions/backup changes. The top strip reads **SAVE ME • EXCHANGE 1.2** (translated) to identify the running JS version. The app's native version is 1.2.0 / versionCode 3.
+Stop if a command fails. A Metro reload is insufficient: this update includes a new native file module, icon and permissions/backup changes. Settings identifies this version as **Save Me 1.3** and reports whether direct-file native crypto is active. The app's native version is 1.3.0 / versionCode 4.
 
 **Do not uninstall or clear app data during these tests.** This pilot supports one encryption identity per account, stored on one device. It deliberately refuses silent identity replacement. Reinstallation/device migration and encrypted backup recovery are not implemented; losing the keys makes old encrypted content unreadable. Vault codes have no recovery flow.
 
@@ -71,4 +77,4 @@ Native compatibility tests compile the production Java module with Android/React
 
 Automated tests cover authenticated encryption/tamper rejection, SQL RLS with three users, key registration, code lockout, server-controlled dates, text/voice retention, blocks and chunk path validation. SQL tests run in PGlite with deterministic **test-only pgcrypto fixtures**; they do not validate real bcrypt, Supabase Storage HTTP, Cron or device behavior. See [SECURITY.md](SECURITY.md) for the security boundaries and [DEVICE_TESTS.md](DEVICE_TESTS.md) for the required phone checks.
 
-Paid plans remain proposals. No billing or paid access is enabled. Message requests, push notifications, full Signal ratcheting, key recovery and multi-device support are not implemented in this pilot.
+Paid plans remain proposals. No billing or paid access is enabled. Message requests, full Signal ratcheting, key recovery and multi-device support are not implemented. Background push requires the deployment described above.

@@ -49,3 +49,18 @@ Repeat wrong-code and RLS checks against the real Supabase project; local databa
 - Record a voice message: white mic, contrasting recording panel, timer, discard and stop; listen before sending.
 - Verify dialogs fit smaller screens, long text scrolls, destructive actions require pressing the intended button, and background/lock dismisses dialogs.
 - Splash: confirm the updated artwork has no “Byenvini”; large “Welcome” and small “SaveMe please” fade in, then the screen closes three seconds after image load. Check short screens and portrait tablets for uncropped artwork.
+
+## Exchange 1.3 gates
+
+Apply 20261004_chat_experience.sql first, install dependencies, prebuild and build a new release APK. Settings must say 1.3 with native Android crypto active.
+
+- Cold-launch: Welcome/SaveMe please show for three seconds even while network/profile sync is pending. Returning to an already-running process does not restart the splash.
+- Compare same-size media over the same connection using Settings transfer timings on both phones. Preparation/transfer/final check must total approximately total time. No latency target has yet been measured on real phones.
+- Record/play/send/reopen a vocal; test speaker playback, pause, resume and finish. Voice is automatically decrypted, photo/video still ask for codes.
+- Change name/photo in Settings and verify Home, then the peer's voice bubble (allow its 30-second profile refresh). Check that profile cards are encrypted and are not readable by a third account.
+- Log out/in: existing threads and non-expired history load without contact search. Duplicate address-book entries resolve to the same account/thread. Different account IDs must remain distinct.
+- Send text: one gray check while receiver is disconnected; two gray when receiver app polls; blue only after text is substantially visible. Media becomes blue after successfully opened. Never equate server push acceptance with delivered/read.
+- Long-press own text and delete: verify both devices lose it on refresh/reopen; received text and every media type must reject deletion through the RPC.
+- First-send notice hides and persists across reopen. Test server timestamps 23 hours old: warning appears within 30 seconds and stops after media expiration.
+- Test vault with original personal PIN, wrong PIN and cooldown. Do not reset SecureStore or clear app data to work around an unknown PIN.
+- Enable notifications. Verify Home/tab badges, generic Android notification content, notification tap routes to the proper chat after unlocking, and logout token cleanup. For closed-app push, complete NOTIFICATIONS_SETUP.md and measure scheduler/FCM latency separately.

@@ -34,6 +34,10 @@ test('native AES chunks and PBKDF2 remain compatible; tampering never appends pl
  byte[] encrypted=Files.readAllBytes(root.resolve("encrypted"));if(!Arrays.equals(encrypted,Files.readAllBytes(root.resolve("expected"))))throw new Exception("format changed");
  result=new Result();module.decryptAppend(Base64.getEncoder().encodeToString(encrypted),root.resolve("output").toUri().toString(),1048576,key,nonce,aad,result);result.waitFor();
  if(!Arrays.equals(Files.readAllBytes(root.resolve("source")),Files.readAllBytes(root.resolve("output"))))throw new Exception("roundtrip");
+ result=new Result();module.decryptFileAppend(root.resolve("encrypted").toUri().toString(),root.resolve("direct").toUri().toString(),1048576,key,nonce,aad,result);result.waitFor();
+ if(!Arrays.equals(Files.readAllBytes(root.resolve("source")),Files.readAllBytes(root.resolve("direct"))))throw new Exception("direct file roundtrip");
+ byte[] corrupt=encrypted.clone();corrupt[10]^=1;Files.write(root.resolve("corrupt"),corrupt);result=new Result();module.decryptFileAppend(root.resolve("corrupt").toUri().toString(),root.resolve("direct").toUri().toString(),1048576,key,nonce,aad,result);boolean directRejected=false;try{result.waitFor();}catch(Exception e){directRejected=true;}
+ if(!directRejected || Files.size(root.resolve("direct"))!=1048576)throw new Exception("direct tamper accepted");
  encrypted[5]^=1;result=new Result();module.decryptAppend(Base64.getEncoder().encodeToString(encrypted),root.resolve("output").toUri().toString(),1048576,key,nonce,aad,result);boolean rejected=false;try{result.waitFor();}catch(Exception e){rejected=true;}
  if(!rejected || Files.size(root.resolve("output"))!=1048576)throw new Exception("tamper accepted or appended");
  result=new Result();module.deriveVaultKey("012345","${salt.toString('base64')}",result);if(!"${derived.toString('base64')}".equals(result.waitFor()))throw new Exception("KDF changed");
