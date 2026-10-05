@@ -1,4 +1,4 @@
-# Run from the repository AFTER applying 20261004_chat_experience.sql.
+# Run from the repository AFTER applying 20261004_chat_experience.sql and 20261005_identity_restart.sql.
 $ErrorActionPreference = 'Stop'
 & {
     $repo = Split-Path $PSScriptRoot -Parent
@@ -35,6 +35,6 @@ $ErrorActionPreference = 'Stop'
             if ($null -eq $result.Code -or $result.Code -ne 0) { throw 'Yon enstalasyon pa konfime.' }
         }
         if ($results.Count -ne 2) { throw 'Pa gen de rezilta enstalasyon.' }
-        Write-Host 'Save Me 1.3.1 enstale sou toude telefon yo. Done yo konsève.'
+        Write-Host 'Save Me 1.3.2 enstale sou toude telefon yo. Done yo konsève.'
     } finally { Pop-Location }
 }

@@ -1,3 +1,4 @@
+import IdentityRestart from '../components/IdentityRestart';
 import { enableNotifications } from '../services/notifications';
 import { shareProfileWithContacts } from '../services/profileCards';
 import * as ImagePicker from 'expo-image-picker';
@@ -133,6 +134,7 @@ export function SettingsScreen({ navigation }) {
         <View style={ss.section}>
           <Text style={ss.sectionTitle}>{t('security')}</Text>
           <View style={ss.item}><Text style={ss.itemLabel}>👆 {t('biometricAuth')}</Text></View>
+          <IdentityRestart />
           <TouchableOpacity style={ss.item} onPress={() => navigation.navigate('Plans')}>
             <Text style={ss.itemLabel}>💎 {t('plans')}</Text>
             <Text style={ss.arrow}>→</Text>
@@ -140,7 +142,7 @@ export function SettingsScreen({ navigation }) {
         </View>
 
         <View style={ss.section}>
-          <Text style={ss.sectionTitle}>Save Me · 1.3.1</Text>
+          <Text style={ss.sectionTitle}>Save Me · 1.3.2</Text>
           <Text style={[ss.profileEmail,{padding:14}]}>{t(NativeModules.SaveMeCrypto?.decryptFileAppend ? 'cryptoNative' : 'cryptoCompatibility')}</Text>
           {Object.entries(syncIssues).filter(([,issue])=>issue).map(([kind,issue])=><View key={kind} style={{padding:14}}>
             <Text style={{color:'#FFB7B7',fontWeight:'700'}}>{t(kind==='identity'?'identitySyncIssue':'profileSyncIssue')}</Text>

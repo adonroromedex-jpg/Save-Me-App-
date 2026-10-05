@@ -16,7 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useStore } from '../store/useStore';
 import { listConversations, listMessages, lookupContact, openMedia, authorizeMedia, normalizePhone, sendMedia, sendText, setContactBlocked, markMessages, deleteTextMessage } from '../services/messages';
-import { securityNumbers } from '../services/identity';
+import { peerKeyReview, acceptPeerIdentity } from '../services/identity';
 import { removePickerCopy } from '../services/vault';
 import { removePrivateFile } from '../services/privateFiles';
 import { useCodePrompt } from '../components/CodePrompt';
@@ -33,6 +33,7 @@ export default function MessagesScreen({ navigation }) {
 
   const { askCode, codeModal } = useCodePrompt();
   const [menuOpen,setMenuOpen] = useState(false);
+  const [keyNeedsReview,setKeyNeedsReview]=useState(false);
   const [peer,setPeer] = useState(null), [mode,setMode] = useState('list');
   const [conversations,setConversations] = useState([]), [messages,setMessages] = useState([]), [contacts,setContacts] = useState([]);
   const [contactQuery,setContactQuery] = useState(''), [contactsLoaded,setContactsLoaded] = useState(false), [contactError,setContactError] = useState(''), [input,setInput] = useState('');
@@ -261,9 +262,26 @@ export default function MessagesScreen({ navigation }) {
     try{await stopSound();await sendMedia(user.id,peer.id,voice,null,setProgress);await noteSent();await discardVoice();await refresh();}
     catch(e){Alert.alert(t('voice'),e.message);}finally{setBusy(false);setProgress(null);}
   };
+  const reviewKey=async()=>{
+    const target=peerRef.current;if(!target)return;
+    try{
+      const review=await peerKeyReview(user.id,target.id);
+      Alert.alert(t('securityNumbers'),`${t(review.changed?'peerKeyChangedHint':'securityHint')}\n\n${review.numbers}`,
+        review.changed?[{text:t('cancel'),style:'cancel'},{text:t('acceptPeerKey'),onPress:async()=>{
+          try{await acceptPeerIdentity(user.id,target.id,review.key);if(peerRef.current?.id===target.id){setKeyNeedsReview(false);decoded.current=new Map();shareProfile(target.id).catch(()=>{});await refresh();}}
+          catch(e){Alert.alert(t('securityNumbers'),e.message);}
+        }}]:[{text:t('close')}]);
+    }catch(e){Alert.alert(t('securityNumbers'),e.message);}
+  };
+  useEffect(()=>{
+    setKeyNeedsReview(false);if(!peer?.id)return;
+    let active=true;
+    const check=async()=>{if(AppState.currentState!=='active')return;try{const review=await peerKeyReview(user.id,peer.id);if(active)setKeyNeedsReview(review.changed);}catch{}};
+    check();const timer=setInterval(check,30000);return()=>{active=false;clearInterval(timer);};
+  },[user?.id,peer?.id]);
   const menu=()=>setMenuOpen(true);
   const menuItems = [
-    ['securityNumbers', async()=>{try{Alert.alert(t('securityNumbers'),`${t('securityHint')}\n\n${await securityNumbers(user.id,peer.id)}`);}catch(e){Alert.alert(t('messages'),e.message);}}],
+    ['securityNumbers',reviewKey],
     ['chatColor',()=>{const next=colors[(colors.indexOf(color)+1)%colors.length];setColor(next);AsyncStorage.setItem(themeKey(peer),next);} ],
     ['blockContact',async()=>{try{await setContactBlocked(user.id,peer.id,true);back();}catch(e){Alert.alert(t('messages'),e.message);}}],
     ['unblockContact',async()=>{try{await setContactBlocked(user.id,peer.id,false);}catch(e){Alert.alert(t('messages'),e.message);}}],
@@ -313,6 +331,7 @@ export default function MessagesScreen({ navigation }) {
     </>}
 
     {mode==='chat' && <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':undefined}>
+      {keyNeedsReview&&<TouchableOpacity onPress={reviewKey}><Text style={[s.hint,{color:'#FFD0BB'}]}>{t('peerKeyChangedAction')}</Text></TouchableOpacity>}
       {expirySoon?<Text style={s.hint}>{t('expirySoon')}</Text>:!hasSent&&<Text style={s.hint}>{t('chatExpiry')}</Text>}
       <FlatList inverted onViewableItemsChanged={onVisible} viewabilityConfig={viewability} data={messages} keyExtractor={m=>m.id} contentContainerStyle={[s.messages,{justifyContent:'flex-start'}]} keyboardShouldPersistTaps="handled"
         ListFooterComponent={messages.length>=50?<TouchableOpacity onPress={older} disabled={loadingOlder}><Text style={s.hint}>{t('olderMessages')}</Text></TouchableOpacity>:null}

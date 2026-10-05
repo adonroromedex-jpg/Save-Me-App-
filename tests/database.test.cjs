@@ -12,6 +12,7 @@ test('migration and RLS enforce sender dates, encrypted access, PIN lockout, blo
  await db.exec(`create role anon; create role authenticated;
  create schema auth; create schema storage; create schema extensions;
  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+ create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;
  create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}',email_confirmed_at timestamptz,created_at timestamptz default now());
  create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint,allowed_mime_types text[]);
  create table storage.objects(id uuid default gen_random_uuid() primary key,bucket_id text,name text,unique(bucket_id,name));
@@ -24,7 +25,7 @@ test('migration and RLS enforce sender dates, encrypted access, PIN lockout, blo
  create function extensions.gen_salt(text,integer) returns text language sql as $$select 'fixture'::text$$;
  create function extensions.crypt(text,text) returns text language sql as $$select md5($1)$$;
  insert into auth.users(id,email_confirmed_at) values('${a}',now()),('${b}',now()),('${e}',now());`);
- for(const name of ['20260929_secure_messaging.sql','20260929_repair_profiles_and_media_limits.sql','20260929_encrypted_exchange.sql','20261004_chat_experience.sql']){
+ for(const name of ['20260929_secure_messaging.sql','20260929_repair_profiles_and_media_limits.sql','20260929_encrypted_exchange.sql','20261004_chat_experience.sql','20261005_identity_restart.sql']){
   const sql=fs.readFileSync(`supabase/migrations/${name}`,'utf8').replace('create extension if not exists pgcrypto with schema extensions;','');
   await db.exec(sql);
  }
@@ -81,7 +82,35 @@ test('migration and RLS enforce sender dates, encrypted access, PIN lockout, blo
  const threads=await rpc('chat_threads_list');assert.equal(threads.length,1);assert.equal(threads[0].id,b,'one persistent conversation per account pair');
  await assert.rejects(db.query('select * from push_devices'),/permission denied/);
  await rpc('register_push',['ExpoPushToken[fixture]']);await rpc('unregister_push');
+ // Fresh email verification, account scoping, CAS and retry safety for lost-key restart.
+ const newKey=Buffer.alloc(32,9).toString('base64');
+ await as(a);await assert.rejects(rpc('restart_chat_identity',[keyA,newKey]),/Fresh email/);
+ await db.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({amr:[{method:'otp',timestamp:Math.floor(Date.now()/1000)-600}]})]);
+ await assert.rejects(rpc('restart_chat_identity',[keyA,newKey]),/Fresh email/);
+ await db.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({amr:[{method:'password',timestamp:Math.floor(Date.now()/1000)}]})]);
+ await assert.rejects(rpc('restart_chat_identity',[keyA,newKey]),/Fresh email/);
+ await db.query("select set_config('request.jwt.claims',$1,false)",[JSON.stringify({amr:[{method:'otp',timestamp:Math.floor(Date.now()/1000)}]})]);
+ await as(e);await assert.rejects(rpc('restart_chat_identity',[keyA,newKey]),/Identity not registered/);
+ await as(a);await assert.rejects(rpc('restart_chat_identity',[keyB,newKey]),/Identity changed/);
+ const beforeRows=(await db.query('select count(*) from messages')).rows[0].count;
+ await as(b);assert.equal(await rpc('count_unread_messages'),1,'unopened voice counts before rotation');await as(a);
+ assert.equal(await rpc('restart_chat_identity',[keyA,newKey]),newKey);
+ assert.equal(await rpc('restart_chat_identity',[keyA,newKey]),newKey,'lost-response retry is idempotent');
+ assert.deepEqual(await rpc('get_chat_identity',[a]),{public_key:newKey,version:2});
+ assert.equal(await rpc('get_chat_key',[b]),keyB,'other account key unchanged');
+ assert.equal((await db.query('select count(*) from messages')).rows[0].count,beforeRows,'ciphertexts retained');
+ await assert.rejects(db.query('update chat_keys set public_key=$1 where user_id=$2',[keyB,a]),/permission denied/);
+ await assert.rejects(db.query('select * from chat_key_changes'),/permission denied/);
+ await as(b);assert.equal(await rpc('count_unread_messages'),0,'old key generations do not keep unread badge stuck');
+ assert.equal((await db.query('select read_at from messages where id=$1',[voiceId])).rows[0].read_at,null,'unavailable is not falsely marked read');
+ await as(a);await rpc('send_encrypted_text',['77777777-7777-4777-8777-777777777777',b,{...envelopes,sender_key:newKey}]);
+ await as(b);assert.equal(await rpc('count_unread_messages'),1,'new generation counts as unread');
+ await as(e);assert.equal(await rpc('count_unread_messages',[a,null]),0,'outsider cannot inspect another inbox');
+
+ await db.exec('reset role');await db.exec('set role anon');
+ await assert.rejects(rpc('restart_chat_identity',[keyA,newKey]),/permission denied/);
  await db.exec('reset role');
+ await db.exec(fs.readFileSync('supabase/migrations/20261005_identity_restart.sql','utf8'));
  await db.exec(fs.readFileSync('supabase/migrations/20260929_encrypted_exchange.sql','utf8').replace('create extension if not exists pgcrypto with schema extensions;',''));
  await db.exec(fs.readFileSync('supabase/migrations/20261004_chat_experience.sql','utf8'));
  }finally{await db.close();}

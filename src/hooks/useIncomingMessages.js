@@ -31,16 +31,13 @@ export default function useIncomingMessages() {
       if(!alive)return;
       const info=notification.request.content.data || {};
       if(info.recipient!==id)continue;
-      let query=db.from('messages').select('id',{count:'exact',head:true}).eq('recipient_id',id).eq('status','ready').is('read_at',null);
-      if(info.messageId)query=query.eq('id',info.messageId);
-      else if(info.sender)query=query.eq('sender_id',info.sender);
-      else continue;
-      const unread=await query;if(unread.error)throw unread.error;
-      if(!unread.count && alive)await Notifications.dismissNotificationAsync(notification.request.identifier);
+      if(!info.messageId && !info.sender)continue;
+      const unread=await db.rpc('count_unread_messages',{p_sender:info.sender||null,p_message:info.messageId||null});if(unread.error)throw unread.error;
+      if(!unread.data && alive)await Notifications.dismissNotificationAsync(notification.request.identifier);
     }
-    const result=await db.from('messages').select('id',{count:'exact',head:true}).eq('recipient_id',id).eq('status','ready').is('read_at',null);
+    const result=await db.rpc('count_unread_messages');
     if(result.error)throw result.error;
-    if(alive){useStore.getState().setSyncIssue('chat',null);useStore.getState().setUnread(result.count||0);Notifications.setBadgeCountAsync(result.count||0).catch(()=>{});}
+    if(alive){useStore.getState().setSyncIssue('chat',null);useStore.getState().setUnread(result.data||0);Notifications.setBadgeCountAsync(result.data||0).catch(()=>{});}
    }catch(error){if(alive)useStore.getState().setSyncIssue('chat',{code:error.code||'',message:error.message});}
    finally{busy=false;}
   };

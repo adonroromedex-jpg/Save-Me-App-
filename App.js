@@ -61,12 +61,13 @@ export default function App() {
             if (!useStore.getState().isAuthenticated) useStore.getState().restoreUser(publicUser(user));
             setReady(true);
             // Profile sync and key registration have separate diagnostics.
+            const identityRevision=useStore.getState().identityRevision;
             const results = await Promise.allSettled([syncProfile(user), ensureIdentity(user.id)]);
             if (active && attempt===generation && useStore.getState().user?.id === user.id) {
               if(results[0].status==='fulfilled'){const p=results[0].value;useStore.getState().patchUser({firstName:p.first_name,name:p.last_name,phoneNumber:p.phone_e164||''});}
               setIssue('profile', results[0].status === 'rejected' ? results[0].reason :
                 results[0].value.phone_e164 ? null : new Error(t('profilePhoneNeeded')));
-              setIssue('identity', results[1].status === 'rejected' ? results[1].reason : null);
+              if(identityRevision===useStore.getState().identityRevision)setIssue('identity', results[1].status === 'rejected' ? results[1].reason : null);
             }
           }
         }

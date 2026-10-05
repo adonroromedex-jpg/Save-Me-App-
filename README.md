@@ -1,10 +1,10 @@
-# Save Me — Exchange 1.3
+# Save Me — Exchange 1.3.2
 
 Android-first Expo SDK 51 test version. This is a development build, not an audited security product.
 
 ## Exchange 1.3 — chat, delivery and profile fixes
 
-**Apply `supabase/migrations/20261004_chat_experience.sql` before using this update. A new native Android build is required.** Existing ciphertext and vault keys keep their format. Do not uninstall or clear app data.
+**Apply `supabase/migrations/20261004_chat_experience.sql` and then `supabase/migrations/20261005_identity_restart.sql` before using 1.3.2. A new native Android build is required.** Existing ciphertext and vault keys keep their format. Do not uninstall or clear app data.
 
 - Splash starts before profile/network synchronization, with large Welcome and small SaveMe please in a three-second animation. Diagnostic strips are removed; version/native crypto status and exact sync errors are in Settings.
 - Android downloads decrypt directly from temporary encrypted files instead of base64 roundtrips. Three chunks remain the concurrency limit. One redundant authorization request is removed; the code gate, server-clock expiry, final online authorization and five-second viewer checks remain.
@@ -55,9 +55,9 @@ npx expo prebuild --platform android --no-install
 npx expo run:android --variant release --device
 ```
 
-Stop if a command fails. A Metro reload is insufficient: this update includes a new native file module, icon and permissions/backup changes. Settings identifies this version as **Save Me 1.3** and reports whether direct-file native crypto is active. The app's native version is 1.3.0 / versionCode 4.
+Stop if a command fails. A Metro reload is insufficient: this update includes a new native file module, icon and permissions/backup changes. Settings identifies this version as **Save Me 1.3.2** and reports whether direct-file native crypto is active. The app's native version is 1.3.2 / versionCode 6.
 
-**Do not uninstall or clear app data during these tests.** This pilot supports one encryption identity per account, stored on one device. It deliberately refuses silent identity replacement. Reinstallation/device migration and encrypted backup recovery are not implemented; losing the keys makes old encrypted content unreadable. Vault codes have no recovery flow.
+**Do not uninstall or clear app data during these tests.** This pilot supports one encryption identity per account, stored on one device. It deliberately refuses silent identity replacement. Reinstallation can explicitly restart future exchanges after fresh email verification; private-key transfer and encrypted backup recovery are not implemented; losing the keys makes old encrypted content unreadable. Vault codes have no recovery flow.
 
 ## Signup and contact troubleshooting
 
@@ -84,3 +84,14 @@ Paid plans remain proposals. No billing or paid access is enabled. Message reque
 Name edits no longer reassign phone numbers. Media code errors remain in the prompt so the user can retry the same selection. Chat attachments now include the personal Vault: unlock the source with its Vault PIN, then choose a separate PIN for the sent copy. Incoming notifications are reconciled with server read state; historical undelivered messages are not replayed as fresh local alerts on startup. The welcome artwork fills tall screens while retaining its aspect ratio.
 
 No additional SQL migration is required beyond the 1.3 migration. Redeploy `send-message-notifications` if using remote push to include per-message notification IDs; old sender-only notifications are still reconciled by thread. Identity diagnostics now distinguish a missing local private key from a mismatched key. This does not implement private-key recovery, key rotation, account merging or multi-device login.
+
+
+### Exchange 1.3.2: restart after losing a device key
+
+1. Apply `supabase/migrations/20261005_identity_restart.sql` in the same Supabase project as the app. It is additive/idempotent and does not itself rotate keys or delete messages.
+2. Update both phones to 1.3.2 without uninstalling or clearing data.
+3. On each affected account: Settings → Security → Restart secure exchanges. Read the loss warning, request a fresh code to that account's email, then enter it and confirm. If the app locks while reading email, reopen Settings and enter the already requested code.
+4. Open the conversation. Tap the changed-key notice or Chat menu → Security numbers. Compare the full numbers on both phones in person or through an independent trusted channel, then explicitly accept each changed contact key.
+5. Send a new text, photo and voice message in both directions. Old ciphertext remains; messages requiring missing keys cannot be recovered. Their unread state is not falsely changed to "read", but unread badges exclude inaccessible key generations.
+
+The app requests email OTP. Server rotation requires an email-confirmed account and a recent OTP authentication timestamp no older than five minutes in the signed Supabase JWT. It uses a row lock, expected-key comparison and an audit record. A staged private key is durably saved before the request, allowing interrupted completion without another rotation. Existing local secrets are archived in SecureStore before replacement. This is neither backup recovery nor multi-device support.

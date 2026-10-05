@@ -75,3 +75,10 @@ Apply 20261004_chat_experience.sql first, install dependencies, prebuild and bui
 - Missing/mismatched chat keys still block encryption. Do NOT delete chat_keys, overwrite server keys, uninstall or clear device storage as a troubleshooting step. Identify the account and original key-bearing device first. The update cannot reconstruct a lost private key.
 
 Code verification: prompt retry/cancellation, identity preservation/session checks, duplicate-phone name editing, and notification reconciliation have dedicated regression tests. Android JavaScript export was checked; no physical-device or APK installation test was performed in the workspace.
+
+
+## 1.3.2 lost-key restart
+
+Use separate disposable test accounts for this scenario; never uninstall a user's only key-bearing installation. After applying the migration, simulate loss on a test installation, request an email OTP in Settings and confirm restart. Wrong/expired OTPs must leave the server key unchanged. Verify re-opening Settings after a device lock accepts the already requested email code. Verify reauthentication is required server-side even if a client bypasses the UI.
+
+Update both phones, compare the displayed full security numbers independently, and accept changed keys on both. New text/photo/video/voice must work; old ciphertext remains unavailable rather than deleted. Notifications/badges must exclude inaccessible old generations without marking those messages read. Test a dropped network response after server commit: relaunch must complete with the saved staged key. Database/unit tests cover permissions, stale verification, expected-key mismatch, idempotent retry, staged-key recovery and peer approval races. Real Supabase email delivery and physical-device SecureStore behavior still require device testing.

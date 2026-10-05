@@ -4,10 +4,10 @@ This implementation has not received an independent security audit. Use test dat
 
 ## Cryptography and identity
 
-- NaCl `crypto_box` (TweetNaCl 1.0.3) encrypts text and file manifests to the recipient's pinned Curve25519 public key; a second envelope permits sender access. Payloads bind message ID and both account IDs. Device private keys are generated with Expo native CSPRNG and stored in SecureStore, device-only on iOS. Published keys are immutable in this pilot.
+- NaCl `crypto_box` (TweetNaCl 1.0.3) encrypts text and file manifests to the recipient's pinned Curve25519 public key; a second envelope permits sender access. Payloads bind message ID and both account IDs. Device private keys are generated with Expo native CSPRNG and stored in SecureStore, device-only on iOS. Ordinary registration never overwrites published keys. Explicit lost-key restart has a separate verified flow described below.
 - Each file gets a random 256-bit AES-GCM key. Chunks use a random 64-bit per-file nonce prefix plus a 32-bit chunk index; a fresh file key is generated for each file. Authenticated data binds ID, total size, MIME, kind and index. Encrypted manifests bind the chunk count and key. Reordering, modifying and truncating chunks fails authentication/length validation.
 - This is **not Signal Protocol / Double Ratchet**. Static account keys do not provide ratchet-based forward secrecy or post-compromise recovery. First contact is trust-on-first-use. Users can compare full public-key fingerprints through an independent channel. A malicious key directory at first contact remains a risk until verification. Key changes fail closed.
-- One account/device identity, no recovery or rotation UI yet. Never silently regenerate published keys after reinstall. A future explicit, verified rotation and recovery flow is required.
+- One account/device identity. Never silently replace published keys after reinstall. Version 1.3.2 permits explicit restart for future exchanges, not recovery of lost private keys.
 - Metadata (participants, time, media type, size/chunk count, existence of a conversation) remains visible to the service. Legacy text rows remain marked as unencrypted; legacy media cannot be opened by the new viewer and expires under the old rules.
 
 ## Codes and online access
@@ -46,3 +46,14 @@ Direct-file native decrypt authenticates each complete AES-GCM chunk before appe
 Profile photos are no longer local-only: the requested small thumbnail is stored in authenticated NaCl envelopes for each selected chat peer. SQL and RLS restrict card access; ciphertext is not public. Full gallery photos are not included in cards. One profile card can persist after photo/video chat expiry because it is profile data, not expiring chat media.
 
 Push metadata consists of account routing IDs and generic text; it excludes message bodies, PINs and encryption keys. Push provider acceptance is not delivery. Thread/receipt metadata and profile cards persist until account deletion. These changes require the new SQL migration; they are not installed by building an APK.
+
+
+### Explicit identity restart (1.3.2)
+
+The Settings flow warns that old ciphertext requiring a lost key remains unreadable, requests a fresh email OTP, and requires the user's confirmation. The RPC checks authenticated account ownership, confirmed email, and an `otp` AMR timestamp within five minutes (30-second forward tolerance) from the signed Auth JWT. User metadata cannot satisfy this check. Supabase AMR identifies OTP authentication but does not distinguish email from SMS; the app requests email codes and the current deployment uses email Auth. Enabling other OTP channels would broaden accepted server reauthentication. Email-account compromise remains a risk, as with account login; this does not prove possession of the lost private key.
+
+`restart_chat_identity` locks the caller's key row, compares the expected old key, increments its version and appends a private audit row. It never accepts another account ID, never deletes ciphertext, and leaves normal registration immutable. Same-key retries are idempotent. Direct table writes remain forbidden to clients. The new private key is staged in SecureStore before the server call; startup can finalize a committed change after a lost response. Prior local private material is archived rather than discarded, though automatic historical-key decryption is not provided.
+
+Contacts with an old pin fail closed. A reinstalled client with no pin also requires explicit approval for a server key whose version exceeds one. The UI presents the full pair fingerprints and instructs comparison through an independent trusted channel. Acceptance checks that the server key is still exactly the reviewed key. A directory administrator can still lie about a first-seen key/version; this is not a key-transparency system. Legacy builds cannot approve changed pins; update both devices.
+
+Unread counts exclude encrypted messages whose participant keys no longer match the current generation, without forging read receipts. Old ciphertext is retained under existing retention rules. No private-key backup, Vault recovery, multi-device sync or account merging is introduced.

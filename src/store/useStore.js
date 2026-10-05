@@ -17,6 +17,8 @@ export const useStore = create((set) => ({
   files: [],
 
   profileRevision: 0,
+  identityRevision: 0,
+  identityChanged: () => set(state=>({identityRevision:state.identityRevision+1})),
   activeChat: null,
   setActiveChat: activeChat => set({activeChat}),
   unread: 0,

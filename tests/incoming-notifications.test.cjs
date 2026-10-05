@@ -4,7 +4,7 @@ const now=Date.now();let incoming=[{id:'old',sender_id:'bob',created_at:new Date
 const scheduled=[],dismissed=[],marked=[];const state={user:{id:'alice'},activeChat:null,isLocked:false,setSyncIssue(){},setUnread(){},openPeer(){}};
 const useStore=selector=>selector(state);useStore.getState=()=>state;
 const Notifications={addNotificationResponseReceivedListener:()=>({remove(){}}),getLastNotificationResponseAsync:async()=>null,getPermissionsAsync:async()=>({granted:true}),scheduleNotificationAsync:async n=>scheduled.push(n),getPresentedNotificationsAsync:async()=>[{request:{identifier:'read-old',content:{data:{recipient:'alice',sender:'bob',messageId:'read'}}}}],dismissNotificationAsync:async id=>dismissed.push(id),setBadgeCountAsync:async()=>{}};
-const db={from:()=>{let count=false;return{select: function(_,options){count=!!options;return this},eq(){return this},is(){return this},limit(){return this},then(resolve){resolve(count?{count:0}:{data:incoming})}}},channel:()=>({on(_,__,fn){callback=fn;return this},subscribe(){return this}}),removeChannel(){}};
+const db={rpc:async()=>({data:0}),from:()=>{let count=false;return{select: function(_,options){count=!!options;return this},eq(){return this},is(){return this},limit(){return this},then(resolve){resolve(count?{count:0}:{data:incoming})}}},channel:()=>({on(_,__,fn){callback=fn;return this},subscribe(){return this}}),removeChannel(){}};
 const t=x=>x,original=Module._load;Module._load=function(name,parent,isMain){
  if(name==='react-native')return{AppState:{currentState:'active',addEventListener:()=>({remove(){}})}};
  if(name==='react-i18next')return{useTranslation:()=>({t})};

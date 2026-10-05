@@ -2,6 +2,8 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),Module=re
 let session='alice',registered=null,randomCalls=0,writes=0;const saved=new Map();
 const db={auth:{getSession:async()=>({data:{session:{user:{id:session}}}})},rpc:async(name,args)=>({data:name==='get_chat_key'?registered:(registered ||= args.p_key)})};
 const original=Module._load;Module._load=function(name,parent,isMain){
+ if(name==='react-native')return {AppState:{currentState:'active'}};
+ if(name==='../store/useStore')return {useStore:{getState:()=>({user:{id:session},isLocked:false})}};
  if(name==='expo-secure-store')return{getItemAsync:async k=>saved.get(k),setItemAsync:async(k,v)=>{writes++;saved.set(k,v)}};
  if(name==='expo-crypto')return{getRandomBytesAsync:async()=>{randomCalls++;return new Uint8Array(32).fill(7)}};
  if(name==='./supabase')return{getSupabaseClient:()=>db};
