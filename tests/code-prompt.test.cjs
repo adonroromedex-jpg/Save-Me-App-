@@ -1,6 +1,7 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),Module=require('node:module'),path=require('node:path'),babel=require('@babel/core');
 const React=require('react'),renderer=require('react-test-renderer');let api;const listeners=new Set();
 const original=Module._load;Module._load=function(name,parent,isMain){
+ if(name==='../store/useStore')return{useStore:{subscribe:()=>()=>{}}};
  if(name==='react-native')return{AppState:{addEventListener:(_,fn)=>{listeners.add(fn);return{remove:()=>listeners.delete(fn)}}},ActivityIndicator:'Spinner',View:'View',Text:'Text',TextInput:'Input',TouchableOpacity:'Button',Switch:'Switch',ScrollView:'Scroll',StyleSheet:{create:x=>x}};
  if(name==='@react-navigation/native')return{useFocusEffect:()=>{}};
  if(name==='react-i18next')return{useTranslation:()=>({t:x=>x})};

@@ -1,3 +1,4 @@
+import {chunkUrlReader} from './chunkUrls';
 import { transferTimer } from './transferMetrics';
 import { transferQueue } from './transferQueue';
 import * as Crypto from 'expo-crypto';
@@ -96,13 +97,17 @@ export async function listMessages(userId, peerId, before = null, decoded = new 
     try {
       const signature = JSON.stringify([userId,m.sender_id,m.recipient_id,m.encrypted_body]);
       const cached = decoded.get(m.id);
-      if (cached?.signature === signature) return {...m,body:cached.text};
+      if (cached?.signature === signature) return {...m,body:cached.text, decryptError:cached.error};
       const payload = await decryptForSelf(userId, m, m.encrypted_body);
       if (typeof payload.text !== 'string' || !payload.text.length || payload.text.length > 4000) throw new Error('Mesaj modifye.');
       decoded.set(m.id,{signature,text:payload.text});
       while(decoded.size>150) decoded.delete(decoded.keys().next().value);
       return { ...m, body: payload.text };
-    } catch (e) { return { ...m, body: null, decryptError: e.message }; }
+    } catch (e) {
+      if(e.code==='OLD_KEY_GENERATION')decoded.set(m.id,{signature:JSON.stringify([userId,m.sender_id,m.recipient_id,m.encrypted_body]),text:null,error:e.message});
+      while(decoded.size>150)decoded.delete(decoded.keys().next().value);
+      return { ...m, body: null, decryptError: e.message };
+    }
   }));
 }
 export async function sendText(userId, peerId, body) {
@@ -117,11 +122,11 @@ export async function sendText(userId, peerId, body) {
   timer.mark('transfer'); timer.finish(new TextEncoder().encode(text).length);
   return result;
 }
-const requireActive = () => {
-  if (AppState.currentState !== 'active' || useStore.getState().isLocked || !useStore.getState().isAuthenticated) throw new Error('Operasyon an kanpe. Ouvri app la ankò.');
+const requireActive = (userId) => {
+  if (AppState.currentState !== 'active' || useStore.getState().isLocked || !useStore.getState().isAuthenticated || (userId && useStore.getState().user?.id!==userId)) throw new Error('Operasyon an kanpe. Ouvri app la ankò.');
 };
 export async function sendMedia(userId, peerId, asset, pin, onProgress = () => {}) {
-  requireActive();
+  requireActive(userId);
   const timer=transferTimer(userId,asset.type,'send'); onProgress(0,'prepare');
   if (!['image','video','audio'].includes(asset.type)) throw new Error('Fòma sa a pa sipòte.');
   if (asset.type !== 'audio' && !/^\d{6}$/.test(pin || '')) throw new Error('Mete yon kòd 6 chif.');
@@ -142,9 +147,9 @@ export async function sendMedia(userId, peerId, asset, pin, onProgress = () => {
     await transferQueue(manifest.chunks, async index => {
       const temporary = `${privateCache}upload-${id}-${index}.bin`;
       try {
-      requireActive();
+      requireActive(userId);
       await encryptedPart(asset.uri, manifest, index, temporary);
-      requireActive();
+      requireActive(userId);
       const object = `${path}/${index}.bin`;
       // Include uncertain uploads in cleanup too: the server may have accepted bytes before a network error.
       uploaded.push(object);
@@ -157,7 +162,7 @@ export async function sendMedia(userId, peerId, asset, pin, onProgress = () => {
       onProgress(Math.round(++completed / manifest.chunks * 100),'transfer');
       } finally { await removePrivateFile(temporary); }
     });
-    requireActive();
+    requireActive(userId);
     timer.mark('transfer'); onProgress(100,'validate');
     requireData(await client().rpc('finish_encrypted_media', { p_id: id }));
     timer.finish(manifest.size);
@@ -185,7 +190,7 @@ export async function authorizeMedia(messageId) {
   return { ...data, deadline: performance.now() + lifetime - (performance.now() - started) };
 }
 export async function openMedia(userId, message, pin, onProgress = () => {}) {
-  requireActive();
+  requireActive(userId);
   const timer=transferTimer(userId,message.media_kind,'receive'); onProgress(0,'prepare');
   if (!message.media_parts) throw new Error('Ansyen medya sa a pa itilize nouvo pwoteksyon an. Voye li ankò.');
   const unlockStarted=performance.now();
@@ -197,24 +202,15 @@ export async function openMedia(userId, message, pin, onProgress = () => {}) {
   let authorization = {...grant,deadline:unlockStarted+lifetime};
   let checked = unlockStarted;
   const assertAllowed = async () => {
-    requireActive();
+    requireActive(userId);
     if (performance.now() >= authorization.deadline) throw new Error('Medya ekspire.');
     if (performance.now() - checked > 5000) { authorization = await authorizeMedia(message.id); checked = performance.now(); }
   };
   timer.mark('prepare'); onProgress(0,'transfer');
-  let signed = [], signedAt = 0, signing = null, completed = 0;
+  const getChunkUrl=chunkUrlReader(client().storage.from('chat-media'),grant.path,manifest.chunks);
+  let completed=0;
   const uri = await assemblePrivateFile(manifest, async index => {
-    if (!signed[index] || performance.now() - signedAt > 10000) {
-      if (!signing) signing = (async () => {
-        const first = Math.floor(index/3)*3;
-        const paths = Array.from({length: Math.min(3, manifest.chunks-first)}, (_,n) => `${grant.path}/${first+n}.bin`);
-        const urls = requireData(await client().storage.from('chat-media').createSignedUrls(paths, 15));
-        signed = []; signedAt = performance.now();
-        urls.forEach((entry,n) => { if(entry.error || !entry.signedUrl) throw new Error('Telechajman pa otorize.'); signed[first+n] = entry.signedUrl; });
-      })().finally(() => { signing = null; });
-      await signing;
-    }
-    const signedUrl = signed[index];
+    const signedUrl=await getChunkUrl(index);
     const temporary = `${privateCache}download-${Crypto.randomUUID()}.bin`;
     let handedOff = false;
     try {
@@ -228,7 +224,7 @@ export async function openMedia(userId, message, pin, onProgress = () => {}) {
   timer.mark('transfer'); onProgress(100,'validate');
   try {
     authorization = await authorizeMedia(message.id);
-    requireActive();
+    requireActive(userId);
     timer.finish(manifest.size);
     return { uri, message, deadline: authorization.deadline };
   } catch (e) { await removePrivateFile(uri); throw e; }

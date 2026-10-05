@@ -58,7 +58,7 @@ export default function App() {
           if (!active || attempt!==generation) return;
           if (error || !user) useStore.getState().logout();
           else {
-            if (!useStore.getState().isAuthenticated) useStore.getState().restoreUser(publicUser(user));
+            if (useStore.getState().user?.id !== user.id) useStore.getState().restoreUser(publicUser(user));
             setReady(true);
             // Profile sync and key registration have separate diagnostics.
             const identityRevision=useStore.getState().identityRevision;
@@ -92,7 +92,7 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <SafeAreaView onTouchStart={resetTimer} style={{ flex: 1, backgroundColor: '#0A0A1A' }} edges={['top']}>
-        <SecureOverlayProvider>
+        <SecureOverlayProvider hidden={locked}>
         <NavigationContainer ref={navigationRef} onReady={openNotification}>
           <StatusBar style="light" />
           <AppNavigator />

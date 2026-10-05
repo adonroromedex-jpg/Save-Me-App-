@@ -57,3 +57,10 @@ The Settings flow warns that old ciphertext requiring a lost key remains unreada
 Contacts with an old pin fail closed. A reinstalled client with no pin also requires explicit approval for a server key whose version exceeds one. The UI presents the full pair fingerprints and instructs comparison through an independent trusted channel. Acceptance checks that the server key is still exactly the reviewed key. A directory administrator can still lie about a first-seen key/version; this is not a key-transparency system. Legacy builds cannot approve changed pins; update both devices.
 
 Unread counts exclude encrypted messages whose participant keys no longer match the current generation, without forging read receipts. Old ciphertext is retained under existing retention rules. No private-key backup, Vault recovery, multi-device sync or account merging is introduced.
+
+
+### Re-entry and account isolation (1.3.3)
+
+Background transition locks immediately; successful enrolled biometrics are required to reopen, with native device-PIN fallback disabled. Fresh email sign-in also lands locked. A brief `inactive` system dialog alone does not count as app background. Screens remain mounted but hidden from display/accessibility behind the biometric gate so external picker results can survive; sensitive portal overlays are completely suppressed while locked. Camera activity stops and media previews/PIN prompts clear on locking. The picker result is processed only after the same account unlocks; logout/account switch rejects the wait and cleans the temporary source.
+
+Sender/receiver file operations and Vault operations check the initiating account as well as active/unlocked state. Account switches remount the navigation tree and clear UI metadata. Logout does not delete per-account SecureStore keys. File URL signing batches now cover 24 chunks, but URLs still expire after 15 seconds, refresh after 10 seconds, and plaintext assembly still checks active authorization. This reduces control requests without removing the online gate.

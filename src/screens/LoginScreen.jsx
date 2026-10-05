@@ -31,11 +31,13 @@ export default function LoginScreen({ navigation }) {
   };
 
   const handleVerify = async () => {
+    if(loading || !/^\d{6,8}$/.test(otp))return;
+    setLoading(true);
     try {
       setUser(await verifyEmailCode(email, otp));
     } catch (e) {
       Alert.alert(t('invalidCode'), e.message);
-    }
+    } finally {setLoading(false);}
   };
 
   return (
@@ -55,8 +57,8 @@ export default function LoginScreen({ navigation }) {
         {codeSent ? <>
           <Text style={s.forgotText}>{t('codeSentTo', { email })}</Text>
           <TextInput style={s.input} placeholder={t('emailCode')} placeholderTextColor="#555"
-            keyboardType="number-pad" maxLength={8} value={otp} onChangeText={setOtp} />
-          <TouchableOpacity style={s.btnPrimary} onPress={handleVerify}>
+            keyboardType="number-pad" maxLength={8} value={otp} onChangeText={v=>setOtp(v.replace(/\D/g,''))} autoComplete="one-time-code" />
+          <TouchableOpacity style={s.btnPrimary} disabled={loading} onPress={handleVerify}>
             <Text style={s.btnPrimaryText}>{t('verifyEmail')}</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.registerLink} onPress={() => setCodeSent(false)}>
@@ -96,7 +98,7 @@ const s = StyleSheet.create({
   title: { color: '#fff', fontSize: 26, fontWeight: '700' },
   input: { backgroundColor: '#12122A', borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.1)', borderRadius: 12, padding: 14, color: '#fff', fontSize: 14, marginBottom: 12 },
   forgot: { alignSelf: 'flex-end', marginBottom: 20 },
-  forgotText: { color: '#1565C0', fontSize: 12 },
+  forgotText: { color: '#AFCBF0', fontSize: 14, lineHeight: 22, marginBottom: 22, paddingHorizontal: 2 },
   btnPrimary: { backgroundColor: '#D32F2F', borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   registerLink: { alignItems: 'center', marginTop: 20 },

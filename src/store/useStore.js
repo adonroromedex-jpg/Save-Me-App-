@@ -1,6 +1,8 @@
 // src/store/useStore.js
 import { create } from 'zustand';
 
+const accountChange=(state,user)=>state.user?.id===user.id?{}:{files:[],unread:0,pendingPeer:null,activeChat:null,syncIssues:{},transferMetrics:[],deliveryMetrics:[]};
+
 export const useStore = create((set) => ({
   // Auth
   user: null,
@@ -38,8 +40,8 @@ export const useStore = create((set) => ({
   alerts: [],
 
   // Actions
-  setUser: (user) => set({ user, isAuthenticated: true, isLocked: false }),
-  restoreUser: (user) => set({ user, isAuthenticated: true, isLocked: true }),
+  setUser: (user) => set(state=>({...accountChange(state,user),user,isAuthenticated:true,isLocked:true})),
+  restoreUser: (user) => set(state=>({...accountChange(state,user),user,isAuthenticated:true,isLocked:true})),
   logout: () => set({ user: null, isAuthenticated: false, isLocked: true, files: [], plan: 'free', syncIssues: {}, transferMetrics: [], deliveryMetrics: [], unread:0, pendingPeer:null, activeChat:null }),
   lockApp: () => set({ isLocked: true }),
   unlockApp: () => set({ isLocked: false }),

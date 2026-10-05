@@ -13,7 +13,7 @@ export async function isBiometricAvailable() {
 export async function getBiometricType() {
   const level = await LocalAuthentication.getEnrolledLevelAsync();
   if (level === LocalAuthentication.SecurityLevel.NONE) return 'none';
-  if (level === LocalAuthentication.SecurityLevel.SECRET) return 'pin';
+  if (level !== LocalAuthentication.SecurityLevel.BIOMETRIC) return 'none';
   const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
   if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
     return 'face';
@@ -21,20 +21,20 @@ export async function getBiometricType() {
   if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
     return 'fingerprint';
   }
-  return 'pin';
+  return 'none';
 }
 
 // Authenticate user with biometrics
 export async function authenticate(promptMessage = 'Verify your identity', labels = {}) {
   try {
     const level = await LocalAuthentication.getEnrolledLevelAsync();
-    if (level === LocalAuthentication.SecurityLevel.NONE) {
+    if (level !== LocalAuthentication.SecurityLevel.BIOMETRIC) {
       return { success: false, error: 'device_lock_not_available' };
     }
     const result = await LocalAuthentication.authenticateAsync({
       promptMessage,
       fallbackLabel: labels.fallback || 'Use device PIN',
-      disableDeviceFallback: false,
+      disableDeviceFallback: true,
       cancelLabel: labels.cancel || 'Cancel',
     });
     return result;

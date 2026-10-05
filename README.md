@@ -1,4 +1,4 @@
-# Save Me — Exchange 1.3.2
+# Save Me — Exchange 1.3.3
 
 Android-first Expo SDK 51 test version. This is a development build, not an audited security product.
 
@@ -55,7 +55,7 @@ npx expo prebuild --platform android --no-install
 npx expo run:android --variant release --device
 ```
 
-Stop if a command fails. A Metro reload is insufficient: this update includes a new native file module, icon and permissions/backup changes. Settings identifies this version as **Save Me 1.3.2** and reports whether direct-file native crypto is active. The app's native version is 1.3.2 / versionCode 6.
+Stop if a command fails. A Metro reload is insufficient: this update includes a new native file module, icon and permissions/backup changes. Settings identifies this version as **Save Me 1.3.3** and reports whether direct-file native crypto is active. The app's native version is 1.3.3 / versionCode 7.
 
 **Do not uninstall or clear app data during these tests.** This pilot supports one encryption identity per account, stored on one device. It deliberately refuses silent identity replacement. Reinstallation can explicitly restart future exchanges after fresh email verification; private-key transfer and encrypted backup recovery are not implemented; losing the keys makes old encrypted content unreadable. Vault codes have no recovery flow.
 
@@ -95,3 +95,12 @@ No additional SQL migration is required beyond the 1.3 migration. Redeploy `send
 5. Send a new text, photo and voice message in both directions. Old ciphertext remains; messages requiring missing keys cannot be recovered. Their unread state is not falsely changed to "read", but unread badges exclude inaccessible key generations.
 
 The app requests email OTP. Server rotation requires an email-confirmed account and a recent OTP authentication timestamp no older than five minutes in the signed Supabase JWT. It uses a row lock, expected-key comparison and an audit record. A staged private key is durably saved before the request, allowing interrupted completion without another rotation. Existing local secrets are archived in SecureStore before replacement. This is neither backup recovery nor multi-device support.
+
+
+### Exchange 1.3.3: audit and regression fixes
+
+No new SQL beyond the 1.3.2 migration. Login verification copy has more space, voice bubbles use playback controls without a PIN-lock icon, and code prompts show transfer progress. Audio remains encrypted with automatic recipient decryption. Short-lived chunk URLs are now requested for up to 24 encrypted parts at a time, while byte transfer remains bounded to three parts and URL lifetime/online expiry checks remain unchanged. Known old-key text failures are cached until chat invalidation instead of repeating network verification every poll. Chat polling pauses during a transfer.
+
+Returning from background now requires enrolled biometrics immediately, with device-PIN fallback disabled. Main screens stay hidden behind the biometric screen, all sensitive overlays are suppressed, and native camera activity stops while locked. Gallery results wait for the same account to unlock; changing accounts rejects pending selections. Account changes reset UI state but logout retains each account's SecureStore keys and encrypted Vault.
+
+See `AUDIT_1.3.3.md` for the complete request audit and remaining device checks. The reported splash alignment and real-device transfer regression are not claimed resolved without visual evidence and timing measurements. Background push still requires deployment/configuration; SMS/WhatsApp OTP and splash audio are not implemented.

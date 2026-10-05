@@ -2,7 +2,7 @@
   "expo": {
     "name": "Save Me",
     "slug": "save-me-secure",
-    "version": "1.3.2",
+    "version": "1.3.3",
     "orientation": "portrait",
     "icon": "./assets/icon_white.png",
     "userInterfaceStyle": "dark",
@@ -32,7 +32,7 @@
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.saveme.secure",
-      "versionCode": 6,
+      "versionCode": 7,
       "compileSdkVersion": 34,
       "targetSdkVersion": 34,
       "minSdkVersion": 24,

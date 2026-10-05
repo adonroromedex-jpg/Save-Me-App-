@@ -64,18 +64,18 @@ function MainTabs() {
 }
 
 export default function AppNavigator() {
-  const { isAuthenticated, isLocked } = useStore();
+  const { isAuthenticated, isLocked, user } = useStore();
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <View style={{flex:1}}>
+    <View style={{flex:1,display:isAuthenticated&&isLocked?'none':'flex'}} accessibilityElementsHidden={isAuthenticated&&isLocked} importantForAccessibility={isAuthenticated&&isLocked?'no-hide-descendants':'auto'}>
+    <Stack.Navigator key={user?.id||'guest'} screenOptions={{ headerShown: false }}>
       {!isAuthenticated ? (
         <>
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="Register" component={RegisterScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
         </>
-      ) : isLocked ? (
-        <Stack.Screen name="Biometric" component={BiometricScreen} />
       ) : (
         <>
           <Stack.Screen name="Main" component={MainTabs} />
@@ -83,5 +83,8 @@ export default function AppNavigator() {
         </>
       )}
     </Stack.Navigator>
+    </View>
+    {isAuthenticated&&isLocked&&<BiometricScreen />}
+    </View>
   );
 }

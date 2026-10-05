@@ -10,21 +10,21 @@ import { useStore } from '../store/useStore';
 import { AppState } from 'react-native';
 const ROOT = `${FileSystem.documentDirectory}private-vault/`;
 const indexKey = id => `vault-index-${id}`;
-const requireActive = () => { if (AppState.currentState !== 'active' || useStore.getState().isLocked) throw new Error('Ouvri app la ankò.'); };
+const requireActive = userId => { if (AppState.currentState !== 'active' || useStore.getState().isLocked || useStore.getState().user?.id!==userId) throw new Error('Ouvri app la ankò.'); };
 export async function listVaultFiles(id) { return JSON.parse((await AsyncStorage.getItem(indexKey(id))) || '[]'); }
 export async function importVaultFile(userId, asset, pin, onProgress = () => {}) {
-  requireActive();
+  requireActive(userId);
   if (!['image','video'].includes(asset.type)) throw new Error('Chwazi yon foto oswa videyo.');
   const master = await unlockVaultKey(userId,pin);
   const manifest = await prepareManifest(asset);
   const directory = `${ROOT}${userId}-${manifest.id}/`;
   await FileSystem.makeDirectoryAsync(directory, { intermediates:true });
   try {
-    for (let i=0;i<manifest.chunks;i++) { requireActive(); await encryptedPart(asset.uri,manifest,i,`${directory}${i}.bin`); onProgress(Math.round((i+1)/manifest.chunks*100)); }
+    for (let i=0;i<manifest.chunks;i++) { requireActive(userId); await encryptedPart(asset.uri,manifest,i,`${directory}${i}.bin`); onProgress(Math.round((i+1)/manifest.chunks*100)); }
     const nonce = await Crypto.getRandomBytesAsync(12);
     const item = { id:manifest.id,type:asset.type,size:manifest.size,createdAt:new Date().toISOString(),
       nonce:encode(nonce),sealed:encode(gcm(master,nonce).encrypt(utf8ToBytes(JSON.stringify(manifest)))) };
-    requireActive();
+    requireActive(userId);
     const next = [item,...await listVaultFiles(userId)];
     await AsyncStorage.setItem(indexKey(userId),JSON.stringify(next));
     return next;
@@ -32,23 +32,23 @@ export async function importVaultFile(userId, asset, pin, onProgress = () => {})
   finally { master.fill(0); }
 }
 export async function openVaultFile(userId,item,pin,onProgress = () => {}) {
-  requireActive();
+  requireActive(userId);
   const master = await unlockVaultKey(userId,pin);
   try {
     if (item.sealed) {
       const manifest = JSON.parse(bytesToUtf8(gcm(master,decode(item.nonce)).decrypt(decode(item.sealed))));
       if (manifest.id !== item.id) throw new Error('Invalid vault manifest');
-      return await assemblePrivateFile(manifest, async i => { const part = decode(await FileSystem.readAsStringAsync(`${ROOT}${userId}-${item.id}/${i}.bin`,{encoding:'base64'})); onProgress(Math.round((i+1)/manifest.chunks*100)); return part; }, requireActive);
+      return await assemblePrivateFile(manifest, async i => { const part = decode(await FileSystem.readAsStringAsync(`${ROOT}${userId}-${item.id}/${i}.bin`,{encoding:'base64'})); onProgress(Math.round((i+1)/manifest.chunks*100)); return part; }, ()=>requireActive(userId));
     }
     // Read pre-v2 vault entries with the migrated master key, without discarding user files.
     const ciphertext=decode(await FileSystem.readAsStringAsync(`${ROOT}${userId}-${item.id}.bin`,{encoding:'base64'}));
     const nonce=new Uint8Array(item.nonce.match(/../g).map(x=>parseInt(x,16)));
     const plain=gcm(master,nonce).decrypt(ciphertext);
-    requireActive();
+    requireActive(userId);
     await FileSystem.makeDirectoryAsync(privateCache,{intermediates:true});
     const uri=`${privateCache}legacy-${Crypto.randomUUID()}.${item.type==='video'?'mp4':'jpg'}`;
     await FileSystem.writeAsStringAsync(uri,encode(plain),{encoding:'base64'}); plain.fill(0);
-    try { requireActive(); return uri; } catch(e) { await removePrivateFile(uri); throw e; }
+    try { requireActive(userId); return uri; } catch(e) { await removePrivateFile(uri); throw e; }
   } finally { master.fill(0); }
 }
 export const removeVaultPreview=removePrivateFile;

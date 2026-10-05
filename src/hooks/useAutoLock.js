@@ -1,56 +1,26 @@
-// src/hooks/useAutoLock.js
 import { useEffect, useRef, useCallback } from 'react';
 import { AppState } from 'react-native';
 import { useStore } from '../store/useStore';
-
 const ACTIVE_IDLE_MS = 10 * 60 * 1000;
-
 export default function useAutoLock() {
-  const { isAuthenticated, lockApp, autoLockSeconds } = useStore();
-  const autoLockMs = autoLockSeconds * 1000;
-  const timerRef = useRef(null);
-  const lastActiveRef = useRef(Date.now());
-  const appStateRef = useRef(AppState.currentState);
-
-  const resetTimer = useCallback(() => {
-    lastActiveRef.current = Date.now();
-    if (timerRef.current) clearTimeout(timerRef.current);
-    if (isAuthenticated) {
-      timerRef.current = setTimeout(() => {
-        lockApp();
-      }, ACTIVE_IDLE_MS);
-    }
-  }, [isAuthenticated, lockApp, autoLockMs]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-
-    resetTimer();
-
-    // Detekte lè app la al background
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      if (appStateRef.current === 'active' && nextState.match(/inactive|background/)) {
-        lastActiveRef.current = Date.now();
-      }
-
-      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
-        // App la tounen — tcheke si 10 minit pase
-        const elapsed = Date.now() - lastActiveRef.current;
-        if (elapsed >= autoLockMs) {
-          lockApp();
-        } else {
-          resetTimer();
-        }
-      }
-
-      appStateRef.current = nextState;
-    });
-
-    return () => {
-      subscription.remove();
-      if (timerRef.current) clearTimeout(timerRef.current);
+  const authenticated=useStore(s=>s.isAuthenticated);
+  const timer=useRef(null);
+  const resetTimer=useCallback(()=>{
+    clearTimeout(timer.current);
+    if(authenticated)timer.current=setTimeout(()=>useStore.getState().lockApp(),ACTIVE_IDLE_MS);
+  },[authenticated]);
+  useEffect(()=>{
+    if(!authenticated)return;
+    const protect=state=>{
+      const current=useStore.getState();
+      if(state==='background'){
+        clearTimeout(timer.current);
+        if(current.isAuthenticated && !current.isLocked)current.lockApp();
+      }else if(state==='active')resetTimer();
     };
-  }, [isAuthenticated, resetTimer, lockApp, autoLockMs]);
-
-  return { resetTimer };
+    protect(AppState.currentState);
+    const subscription=AppState.addEventListener('change',protect);
+    return()=>{subscription.remove();clearTimeout(timer.current);};
+  },[authenticated,resetTimer]);
+  return {resetTimer};
 }

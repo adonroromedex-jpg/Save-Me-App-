@@ -12,13 +12,15 @@ import { useCodePrompt } from '../components/CodePrompt';
 import { MAX_VIDEO_SECONDS } from '../services/mediaLimits';
 
 export function CameraScreen({ route, navigation }) {
-  const {t}=useTranslation();const {askCode,codeModal}=useCodePrompt();
+  const {t}=useTranslation();const {askCode,codeModal,setCodeProgress}=useCodePrompt();
   const [permission,requestPermission]=useCameraPermissions(),[microphone,requestMicrophone]=useMicrophonePermissions();
   const [facing,setFacing]=useState('back'),[mode,setMode]=useState('picture'),[busy,setBusy]=useState(false),[recording,setRecording]=useState(false);
-  const [seconds,setSeconds]=useState(0),[progress,setProgress]=useState(null),[active,setActive]=useState(AppState.currentState==='active');
+  const [seconds,setSeconds]=useState(0),[progress,updateProgress]=useState(null),[active,setActive]=useState(AppState.currentState==='active');
+  const setProgress=(value,stage)=>{updateProgress(value);setCodeProgress(value,stage);};
   const camera=useRef(null),valid=useRef(0),working=useRef(false);
   const focused=useIsFocused();const userId=useStore(s=>s.user?.id),setFiles=useStore(s=>s.setFiles);
   const peer=route.params?.chatPeer;
+  const locked=useStore(s=>s.isLocked);
   useFocusEffect(useCallback(()=>()=>{valid.current++;camera.current?.stopRecording();},[]));
   useEffect(()=>{const sub=AppState.addEventListener('change',state=>{setActive(state==='active');if(state!=='active'){valid.current++;camera.current?.stopRecording();}});return()=>{valid.current++;sub.remove();};},[]);
   useEffect(()=>{if(!recording)return;const timer=setInterval(()=>setSeconds(n=>n+1),1000);return()=>clearInterval(timer);},[recording]);
@@ -60,7 +62,7 @@ export function CameraScreen({ route, navigation }) {
     <View style={s.header}><Text style={s.text}>{peer?t('chatTarget',{name:`${peer.first_name||''} ${peer.last_name||''}`}):t('vaultTarget')}</Text>
       {!!peer && <TouchableOpacity disabled={busy} onPress={()=>navigation.setParams({chatPeer:null})}><Text style={s.link}>{t('vault')}</Text></TouchableOpacity>}
     </View>
-    {focused && active && <CameraView style={{flex:1,width:'100%'}} ref={camera} facing={facing} mode={mode} videoQuality="480p" mute={false} />}
+    {focused && active && !locked && <CameraView style={{flex:1,width:'100%'}} ref={camera} facing={facing} mode={mode} videoQuality="480p" mute={false} />}
     <View style={s.controls}>
       <Text style={s.hint}>{recording?t('cameraRecording',{seconds}):t('videoLimit')}</Text>
       {busy && !recording && <ActivityIndicator color="#82B9FF" />}{progress!==null && <Text style={s.text}>{progress}%</Text>}

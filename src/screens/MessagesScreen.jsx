@@ -1,3 +1,4 @@
+import {waitForAccountUnlock} from '../services/accountAccess';
 import useOwnAvatar from '../hooks/useOwnAvatar';
 import { shareProfile, peerProfilePhoto } from '../services/profileCards';
 import { getSupabaseClient } from '../services/supabase';
@@ -26,12 +27,13 @@ const colors = ['#1565C0','#4B3781','#17655D','#7F3546'];
 export default function MessagesScreen({ navigation }) {
   const { t } = useTranslation();
   const user = useStore(s => s.user);
+  const locked=useStore(s=>s.isLocked);
   const ownAvatar=useOwnAvatar(),pendingPeer=useStore(s=>s.pendingPeer);
   const [peerAvatar,setPeerAvatar]=useState(null),[hasSent,setHasSent]=useState(false),[expirySoon,setExpirySoon]=useState(false);
   const introKey=id=>`chat-intro-sent-${user.id}-${id}`;
   const noteSent=async()=>{setHasSent(true);if(peerRef.current)await AsyncStorage.setItem(introKey(peerRef.current.id),'1').catch(()=>{});};
 
-  const { askCode, codeModal } = useCodePrompt();
+  const { askCode, codeModal, setCodeProgress } = useCodePrompt();
   const [menuOpen,setMenuOpen] = useState(false);
   const [keyNeedsReview,setKeyNeedsReview]=useState(false);
   const [peer,setPeer] = useState(null), [mode,setMode] = useState('list');
@@ -40,12 +42,13 @@ export default function MessagesScreen({ navigation }) {
   const [busy,setBusy] = useState(false), [error,setError] = useState(''), [progress,updateProgress] = useState(null);
   const [preview,setPreview] = useState(null), [recording,setRecording] = useState(false), [voice,setVoice] = useState(null);
   const [phase,setPhase] = useState('prepare');
-  const setProgress = (value,stage) => {updateProgress(value);if(stage)setPhase(stage);};
+  const setProgress = (value,stage) => {setCodeProgress(value,stage);updateProgress(value);if(stage)setPhase(stage);};
   const [audioStatus,setAudioStatus] = useState({});
   const [seconds,setSeconds] = useState(0), [color,setColor] = useState(colors[0]), [loadingOlder,setLoadingOlder] = useState(false);
   const peerRef = useRef(null), previewRef = useRef(null), recordingRef = useRef(null), voiceRef = useRef(null), soundRef = useRef(null);
   const alive = useRef(true), focused = useRef(false), operation = useRef(0), refreshing = useRef(false);
   const decoded = useRef(new Map());
+  const busyRef=useRef(false);busyRef.current=busy;
   const readRequests=useRef(new Set());
   const viewability=useRef({itemVisiblePercentThreshold:70,minimumViewTime:700}).current;
   const onVisible=useRef(({viewableItems})=>{
@@ -70,8 +73,9 @@ export default function MessagesScreen({ navigation }) {
     if(recorder) { await recorder.stopAndUnloadAsync().catch(()=>{}); await removePickerCopy({uri:recorder.getURI()}).catch(()=>{}); }
     await Audio.setAudioModeAsync({allowsRecordingIOS:false,staysActiveInBackground:false}).catch(()=>{});
   },[]);
-  const refresh = useCallback(async () => {
-    if(!user?.id || refreshing.current || !focused.current || AppState.currentState!=='active') return;
+  useEffect(()=>{if(locked){decoded.current=new Map();operation.current++;closePreview();abortRecording();discardVoice();}},[locked,closePreview,abortRecording,discardVoice]);
+  const refresh = useCallback(async (force=false) => {
+    if(!user?.id || useStore.getState().isLocked || refreshing.current || (busyRef.current&&force!==true) || !focused.current || AppState.currentState!=='active') return;
     refreshing.current=true;
     const target=peerRef.current?.id;
     try {
@@ -196,7 +200,7 @@ export default function MessagesScreen({ navigation }) {
   };
   const submitText=async()=>{
     if(!input.trim() || busy || !peer)return;setBusy(true);
-    try{await sendText(user.id,peer.id,input);await noteSent();setInput('');await refresh();}catch(e){Alert.alert(t('messages'),e.message);}finally{setBusy(false);}
+    try{await sendText(user.id,peer.id,input);await noteSent();setInput('');await refresh(true);}catch(e){Alert.alert(t('messages'),e.message);}finally{setBusy(false);}
   };
   const pickMedia=async()=>{
     if(busy)return;
@@ -205,10 +209,11 @@ export default function MessagesScreen({ navigation }) {
     if(result.canceled || !result.assets?.[0])return;
     const asset=result.assets[0];setBusy(true);
     try{
+      await waitForAccountUnlock(user.id);
       const code=await askCode({create:true,shareOption:true,onSubmit:code=>sendMedia(user.id,peer.id,asset,code.pin,setProgress)});if(!code)return;
       await noteSent();
       if(code.share)try{await sendText(user.id,peer.id,t('sentCode',{code:code.pin}));}catch{Alert.alert(t('messages'),t('sendFailedCode'));}
-      await refresh();
+      await refresh(true);
     }catch(e){Alert.alert(t('messages'),e.message);}finally{await removePickerCopy(asset).catch(()=>{});setBusy(false);setProgress(null);}
   };
   const attachments=()=>Alert.alert(t('attachment'),'',[
@@ -225,7 +230,7 @@ export default function MessagesScreen({ navigation }) {
       previewRef.current=result;setPreview(result);
       if(message.media_kind==='audio') await play(result.uri);
       if(message.recipient_id===user.id)await markMessages([message.id],true);
-    }catch(e){Alert.alert(t('messages'),e.message);await refresh();}finally{setBusy(false);setProgress(null);}
+    }catch(e){Alert.alert(t('messages'),e.message);await refresh(true);}finally{setBusy(false);setProgress(null);}
   };
   const play=async uri=>{
     await stopSound();await Audio.setAudioModeAsync({allowsRecordingIOS:false,playsInSilentModeIOS:true,staysActiveInBackground:false});
@@ -259,7 +264,7 @@ export default function MessagesScreen({ navigation }) {
   useEffect(()=>{if(recording && seconds>=180)stopVoice();},[seconds,recording]);
   const sendVoice=async()=>{
     if(!voice || busy)return;setBusy(true);
-    try{await stopSound();await sendMedia(user.id,peer.id,voice,null,setProgress);await noteSent();await discardVoice();await refresh();}
+    try{await stopSound();await sendMedia(user.id,peer.id,voice,null,setProgress);await noteSent();await discardVoice();await refresh(true);}
     catch(e){Alert.alert(t('voice'),e.message);}finally{setBusy(false);setProgress(null);}
   };
   const reviewKey=async()=>{
@@ -268,7 +273,7 @@ export default function MessagesScreen({ navigation }) {
       const review=await peerKeyReview(user.id,target.id);
       Alert.alert(t('securityNumbers'),`${t(review.changed?'peerKeyChangedHint':'securityHint')}\n\n${review.numbers}`,
         review.changed?[{text:t('cancel'),style:'cancel'},{text:t('acceptPeerKey'),onPress:async()=>{
-          try{await acceptPeerIdentity(user.id,target.id,review.key);if(peerRef.current?.id===target.id){setKeyNeedsReview(false);decoded.current=new Map();shareProfile(target.id).catch(()=>{});await refresh();}}
+          try{await acceptPeerIdentity(user.id,target.id,review.key);if(peerRef.current?.id===target.id){setKeyNeedsReview(false);decoded.current=new Map();shareProfile(target.id).catch(()=>{});await refresh(true);}}
           catch(e){Alert.alert(t('securityNumbers'),e.message);}
         }}]:[{text:t('close')}]);
     }catch(e){Alert.alert(t('securityNumbers'),e.message);}
@@ -306,7 +311,7 @@ export default function MessagesScreen({ navigation }) {
     {busy && <View style={s.inputRow}><ActivityIndicator color="#82B9FF" />{progress!==null && <Text style={s.sub}>{t('transferPhase_'+phase)} · {progress}%</Text>}</View>}
     {mode==='list' && <>
       <FlatList data={conversations} keyExtractor={r=>r.peer.id} onRefresh={refresh} refreshing={false} ListEmptyComponent={<Text style={s.empty}>{t('noConversations')}</Text>}
-        renderItem={({item})=><TouchableOpacity style={s.row} onPress={()=>openChat(item.peer)}><Text style={s.person}>{label(item.peer)}</Text><Text style={s.sub}>🔒 {item.last.media_kind?kindLabel(item.last.media_kind):t('encryptedMessage')}</Text></TouchableOpacity>} />
+        renderItem={({item})=><TouchableOpacity style={s.row} onPress={()=>openChat(item.peer)}><Text style={s.person}>{label(item.peer)}</Text><Text style={s.sub}>{item.last.media_kind==='audio'?'🎙️':'🔒'} {item.last.media_kind?kindLabel(item.last.media_kind):t('encryptedMessage')}</Text></TouchableOpacity>} />
     </>}
     {mode==='contacts' && <>
       <View style={s.contactSearch}>
@@ -340,7 +345,7 @@ export default function MessagesScreen({ navigation }) {
             {(item.sender_id===user.id?ownAvatar:peerAvatar)?<Image source={{uri:item.sender_id===user.id?ownAvatar:peerAvatar}} style={{width:36,height:36,borderRadius:18}} />:<View style={{width:36,height:36,borderRadius:18,backgroundColor:'#254766',alignItems:'center',justifyContent:'center'}}><Text style={s.message}>{item.sender_id===user.id?`${user.firstName?.[0]||''}${user.name?.[0]||''}`:`${peer.first_name?.[0]||''}${peer.last_name?.[0]||''}`}</Text></View>}
             <Ionicons name="play-circle" size={38} color="#FFFFFF" /><Text style={s.message}>{t('listen')}</Text>
           </View>}
-          <Text style={s.message}>{(item.decryptError ? t('messageUnavailable') : item.body) || `🔒 ${kindLabel(item.media_kind)}`}</Text>
+          {item.media_kind!=='audio'&&<Text style={s.message}>{(item.decryptError ? t('messageUnavailable') : item.body) || `🔒 ${kindLabel(item.media_kind)}`}</Text>}
           {item.legacy && <Text style={s.time}>{t('legacyMessage')}</Text>}
           {!!item.expires_at && <Text style={s.time}>{expiryLabel(item)}</Text>}
           <View style={{flexDirection:'row',alignItems:'center',gap:7}}><Text style={s.time}>{new Date(item.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</Text>

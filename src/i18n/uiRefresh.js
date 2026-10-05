@@ -1,5 +1,6 @@
 export const uiRefresh = {
   ht: {
+    biometricRequired: "Aktive anprent oswa rekonesans figi nan paramèt telefòn nan pou debloke Save Me.",
     restartIdentity: "Rekòmanse echanj sekirize",
     restartWarning: "Sèvi ak sa sèlman si kle prive ou pèdi apre dezenstalasyon oswa chanjman telefòn. Sa kreye yon nouvo kle pou kont sa a. Ansyen mesaj ki bezwen kle pèdi a pap ka dechifre; yo pap efase otomatikman. Kontak yo dwe verifye nouvo kle a.",
     restartCodeHint: "Mande yon nouvo kòd pa imèl, oswa antre kòd ou fèk resevwa a. Kòd sa a diferan ak kòd Vault ak medya yo.",
@@ -57,6 +58,7 @@ export const uiRefresh = {
     exchangePilot: 'SAVE ME • ECHANJ 1.2',
   },
   en: {
+    biometricRequired: "Set up fingerprint or face recognition in your phone settings to unlock Save Me.",
     restartIdentity: "Restart secure exchanges",
     restartWarning: "Use this only if your private key was lost after reinstalling or changing phones. This creates a new key for this account. Messages requiring the lost key cannot be decrypted; they are not automatically deleted. Contacts must verify the new key.",
     restartCodeHint: "Request a fresh email code, or enter the code you just received. This is separate from Vault and media codes.",
@@ -114,6 +116,7 @@ export const uiRefresh = {
     exchangePilot: 'SAVE ME • EXCHANGE 1.2',
   },
   fr: {
+    biometricRequired: "Activez votre empreinte ou la reconnaissance faciale dans les réglages du téléphone pour déverrouiller Save Me.",
     restartIdentity: "Relancer les échanges sécurisés",
     restartWarning: "À utiliser uniquement si votre clé privée a été perdue après une réinstallation ou un changement de téléphone. Une nouvelle clé sera créée pour ce compte. Les messages nécessitant la clé perdue resteront indéchiffrables, sans suppression automatique. Les contacts doivent vérifier la nouvelle clé.",
     restartCodeHint: "Demandez un nouveau code par e-mail ou saisissez celui que vous venez de recevoir. Ce code est distinct des codes du coffre et des médias.",
@@ -171,6 +174,7 @@ export const uiRefresh = {
     exchangePilot: 'SAVE ME • ÉCHANGE 1.2',
   },
   es: {
+    biometricRequired: "Configure huella o reconocimiento facial en los ajustes del teléfono para desbloquear Save Me.",
     restartIdentity: "Reiniciar intercambios seguros",
     restartWarning: "Úselo solo si perdió su clave privada al reinstalar o cambiar de teléfono. Se creará una nueva clave para esta cuenta. Los mensajes que requieren la clave perdida seguirán siendo indescifrables, sin borrarse automáticamente. Sus contactos deben verificar la nueva clave.",
     restartCodeHint: "Solicite un código nuevo por correo o introduzca el que acaba de recibir. Es distinto de los códigos de la bóveda y los archivos.",

@@ -1,3 +1,4 @@
+import {useStore} from '../store/useStore';
 import { useFocusEffect } from '@react-navigation/native';
 import { SecureOverlay } from './SecureOverlay';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -12,11 +13,14 @@ export function useCodePrompt() {
   const [confirmation, setConfirmation] = useState('');
   const [share, setShare] = useState(false);
   const [submitting,setSubmitting]=useState(false),[error,setError]=useState('');
+  const [progress,setProgress]=useState(null);
+  const setCodeProgress=(value,stage)=>setProgress(value===null?null:{value,stage});
   const resolver = useRef(null),task=useRef(null);
   const finish = value => { const resolve = resolver.current; resolver.current = null; setPrompt(null); setPin(''); setConfirmation(''); setShare(false); if(task.current){task.current.then(()=>resolve?.(null),()=>resolve?.(null));}else resolve?.(value); };
   useEffect(() => {
     const sub = AppState.addEventListener('change', state => { if (state !== 'active') finish(null); });
-    return () => { sub.remove(); finish(null); };
+    const stop=useStore.subscribe((state,previous)=>{if(state.isLocked&&!previous.isLocked)finish(null);});
+    return () => { sub.remove();stop(); finish(null); };
   }, []);
   useFocusEffect(useCallback(() => () => finish(null), []));
   const askCode = options => new Promise(resolve => {
@@ -26,7 +30,7 @@ export function useCodePrompt() {
   const submit = async () => {
     if(task.current || submitting || !valid)return;
     const current=resolver.current;
-    const value={pin,share};setSubmitting(true);setError('');
+    const value={pin,share};setSubmitting(true);setError('');setProgress(null);
     try {
       if(prompt.onSubmit){
         const running=Promise.resolve().then(()=>prompt.onSubmit(value));task.current=running;
@@ -57,11 +61,12 @@ export function useCodePrompt() {
         <Text style={s.hint}>{t('shareCodeWarning')}</Text>
       </>}
       {submitting && <ActivityIndicator color="#82B9FF" />}
+      {submitting && progress && <Text accessibilityLiveRegion="polite" style={s.hint}>{progress.stage?t('transferPhase_'+progress.stage)+' · ':''}{progress.value}%</Text>}
       {!!error && <Text accessibilityLiveRegion="polite" style={{color:'#FFB4B4',marginVertical:8}}>{error}</Text>}
       <View style={s.row}><TouchableOpacity disabled={submitting} style={s.button} onPress={() => finish(null)}><Text style={s.link}>{t('cancel')}</Text></TouchableOpacity>
         <TouchableOpacity style={[s.button,{opacity:valid?1:0.35}]} disabled={!valid || submitting} onPress={submit}><Text style={s.link}>{t('continue')}</Text></TouchableOpacity></View>
     </ScrollView></View>
   </SecureOverlay>;
-  return { askCode, codeModal };
+  return { askCode, codeModal, setCodeProgress };
 }
 const s = StyleSheet.create({ shade:{flex:1,backgroundColor:'rgba(0,0,0,0.85)',justifyContent:'center',padding:24},panel:{backgroundColor:'#18182D',borderRadius:20,padding:22},title:{color:'#fff',fontSize:20,fontWeight:'700'},hint:{color:'#B9B9CB',fontSize:13,lineHeight:19,marginVertical:10},input:{backgroundColor:'#28283E',color:'#fff',padding:15,borderRadius:12,marginVertical:8,fontSize:22,letterSpacing:5},row:{flexDirection:'row',alignItems:'center',justifyContent:'space-between'},button:{paddingVertical:14},link:{color:'#82B9FF',fontSize:14} });

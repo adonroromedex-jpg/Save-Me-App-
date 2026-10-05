@@ -82,3 +82,10 @@ Code verification: prompt retry/cancellation, identity preservation/session chec
 Use separate disposable test accounts for this scenario; never uninstall a user's only key-bearing installation. After applying the migration, simulate loss on a test installation, request an email OTP in Settings and confirm restart. Wrong/expired OTPs must leave the server key unchanged. Verify re-opening Settings after a device lock accepts the already requested email code. Verify reauthentication is required server-side even if a client bypasses the UI.
 
 Update both phones, compare the displayed full security numbers independently, and accept changed keys on both. New text/photo/video/voice must work; old ciphertext remains unavailable rather than deleted. Notifications/badges must exclude inaccessible old generations without marking those messages read. Test a dropped network response after server commit: relaunch must complete with the saved staged key. Database/unit tests cover permissions, stale verification, expected-key mismatch, idempotent retry, staged-key recovery and peer approval races. Real Supabase email delivery and physical-device SecureStore behavior still require device testing.
+
+
+## 1.3.3 re-entry and transfer regression gate
+
+Test enrolled fingerprint/face success, cancellation, no enrollment, immediate background/foreground, screen off/on, and biometric system-dialog transitions. There must be no frame of chat/media or PIN overlays while locked. External gallery selection must survive behind the gate and continue only after biometric success for the same account; switching accounts must clean/reject it. Confirm the camera is inactive behind the lock screen.
+
+Repeat logout/login A→B→A on one phone and verify separate chat/profile/Vault state without key restart. Measure the same media on the same network before/after; signing-call unit tests are not end-to-end speed benchmarks. Photograph the reported splash defect using another phone; its visual alignment remains unverified.

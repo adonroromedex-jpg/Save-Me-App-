@@ -4,7 +4,7 @@ import React, { createContext, useCallback, useContext, useEffect, useLayoutEffe
 import { BackHandler, StyleSheet, View } from 'react-native';
 const OverlayContext=createContext(null);
 let nextId=0;
-export function SecureOverlayProvider({children}) {
+export function SecureOverlayProvider({children,hidden=false}) {
   const [entries,setEntries]=useState({});
   const update=useCallback((id,element)=>setEntries(current=>{
     if(!element && !current[id])return current;
@@ -12,7 +12,7 @@ export function SecureOverlayProvider({children}) {
   }),[]);
   return <OverlayContext.Provider value={update}><View style={{flex:1}}>{children}
     <View pointerEvents="box-none" style={[StyleSheet.absoluteFill,{zIndex:10000,elevation:10000}]}>
-      {Object.entries(entries).map(([id,element])=><View key={id} style={StyleSheet.absoluteFill}>{element}</View>)}
+      {!hidden && Object.entries(entries).map(([id,element])=><View key={id} style={StyleSheet.absoluteFill}>{element}</View>)}
     </View>
   </View></OverlayContext.Provider>;
 }

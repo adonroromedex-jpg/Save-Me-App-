@@ -88,7 +88,7 @@ export async function decryptForSelf(userId, row, envelopes) {
   const peerId = isSender ? row.recipient_id : row.sender_id;
   const [own, peer] = await Promise.all([ensureIdentity(userId), peerIdentity(userId, peerId)]);
   if (envelopes.sender_key !== (isSender ? own.publicKey : peer) || envelopes.recipient_key !== (isSender ? peer : own.publicKey)) {
-    throw new Error('Kle mesaj la pa koresponn ak kontak verifye a.');
+    const error=new Error('Mesaj sa a sèvi ak yon ansyen kle ki pa disponib nan echanj sa a.');error.code='OLD_KEY_GENERATION';throw error;
   }
   const value = unseal(isSender ? envelopes.sender : envelopes.recipient, envelopes.sender_key, own.secretKey);
   if (!value || typeof value !== 'object' || value.id !== row.id || value.sender !== row.sender_id || value.recipient !== row.recipient_id) throw new Error('Mesaj modifye.');

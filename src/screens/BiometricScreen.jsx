@@ -1,6 +1,6 @@
 // src/screens/BiometricScreen.jsx
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { AppState, View, Text, Image, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { authenticate, getBiometricType } from '../services/biometrics';
 import { useStore } from '../store/useStore';
@@ -23,22 +23,23 @@ export default function BiometricScreen() {
         const type = await getBiometricType();
         if (!active.current) return;
         setBioType(type);
-        if (type !== 'none') tryBiometric();
-        else setError(t('deviceLockMissing'));
+        if (type !== 'none' && AppState.currentState==='active') tryBiometric();
+        else if(type==='none')setError(t('biometricRequired'));
       } catch (e) { if (active.current) setError(e.message); }
     })();
-    return () => { active.current = false; };
+    const subscription=AppState.addEventListener('change',state=>{if(state==='active')tryBiometric();});
+    return () => { active.current = false; subscription.remove(); };
   }, []);
 
   const tryBiometric = async () => {
     if (pending.current) return;
     pending.current = true;
-    setBusy(true);
+    setBusy(true);setError('');
     try {
       const result = await authenticate(t('unlockDevice'), { fallback: t('devicePin'), cancel: t('cancel') });
       if (!active.current) return;
-      if (result.success) unlockApp();
-      else setError(t(result.error === 'device_lock_not_available' ? 'deviceLockMissing' : 'biometricRetry'));
+      if (result.success && AppState.currentState==='active') unlockApp();
+      else setError(t(result.error === 'device_lock_not_available' ? 'biometricRequired' : 'biometricRetry'));
     } finally {
       pending.current = false;
       if (active.current) setBusy(false);

@@ -1,3 +1,4 @@
+import {waitForAccountUnlock} from '../services/accountAccess';
 import { Alert } from '../components/AppDialog';
 import PrivateVideo from '../components/PrivateVideo';
 import { SecureOverlay } from '../components/SecureOverlay';
@@ -16,16 +17,18 @@ import { sendMedia, sendText } from '../services/messages';
 export default function VaultScreen({route,navigation}) {
   const peer=route.params?.chatPeer;
   const { t } = useTranslation();
-  const { askCode, codeModal } = useCodePrompt();
+  const { askCode, codeModal, setCodeProgress } = useCodePrompt();
   const getCode = async (onSubmit) => {
     const exists = await hasVaultCode(userId);
     return askCode({ title: t(exists ? 'vaultCode' : 'vaultCodeSetup'), hint: t('vaultCodeHint'), create: !exists, onSubmit });
   };
   const userId = useStore(s => s.user?.id);
+  const locked=useStore(s=>s.isLocked);
   const setFiles = useStore(s => s.setFiles);
   const [files, updateFiles] = useState([]);
   const [search, setSearch] = useState('');
-  const [progress, setProgress] = useState(0);
+  const [progress, updateProgress] = useState(0);
+  const setProgress=(value,stage)=>{updateProgress(value);setCodeProgress(value,stage);};
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(null);
   const previewEpoch = useRef(0);
@@ -41,6 +44,7 @@ export default function VaultScreen({route,navigation}) {
     previewEpoch.current++;
     setPreview(current => { if (current) removeVaultPreview(current.uri).catch(() => {}); return null; });
   }, []);
+  useEffect(()=>{if(locked)closePreview();},[locked,closePreview]);
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => { if (state !== 'active') closePreview(); });
     return () => { subscription.remove(); closePreview(); };
@@ -57,7 +61,7 @@ export default function VaultScreen({route,navigation}) {
     const asset = result.assets[0];
     setProgress(0); setBusy(true);
     try {
-      if (useStore.getState().isLocked) throw new Error(t('unlockBeforeImport'));
+      await waitForAccountUnlock(userId);
       const code = await getCode(async code=>{const next=await importVaultFile(userId,asset,code.pin,setProgress);updateFiles(next);setFiles(next);});
       if (!code) return;
     }
