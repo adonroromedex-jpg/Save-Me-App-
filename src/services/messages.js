@@ -30,7 +30,13 @@ export async function syncProfile(user) {
     phone_e164: existing?.phone_e164 || phone || null,
   };
   if (!existing || ['first_name','last_name','phone_e164'].some(key => existing[key] !== profile[key])) {
-    requireData(await client().from('profiles').upsert(profile, { onConflict: 'id' }));
+    const result = await client().from('profiles').upsert(profile, { onConflict: 'id' });
+    // A legacy duplicate phone must never prevent this account from saving its own name.
+    // Do not transfer the number from another account.
+    if (result.error?.code === '23505' && !existing?.phone_e164) {
+      profile.phone_e164 = null;
+      requireData(await client().from('profiles').upsert(profile, { onConflict: 'id' }));
+    } else requireData(result);
   }
   return profile;
 }
@@ -42,9 +48,15 @@ export async function updateProfile({ firstName, name, phoneNumber }) {
   if (!session.user) throw new Error('Konekte ankò.');
   const existing = requireData(await client().from('profiles').select('phone_e164').eq('id', session.user.id).maybeSingle());
   const phone = existing?.phone_e164 || normalizePhone(session.user.user_metadata?.phoneNumber || phoneNumber);
-  if (!phone) throw new Error('Mete nimewo konplè a pandan enskripsyon an.');
-  const fields={firstName:firstName.trim(),name:name.trim(),phoneNumber:phone};
-  requireData(await client().from('profiles').upsert({id:session.user.id,first_name:fields.firstName,last_name:fields.name,phone_e164:phone},{onConflict:'id'}));
+  const registering = phoneNumber !== undefined;
+  if (registering && !phone) throw new Error('Mete nimewo konplè a pandan enskripsyon an.');
+  const fields={firstName:firstName.trim(),name:name.trim()};
+  if (registering) fields.phoneNumber=phone;
+  const row={id:session.user.id,first_name:fields.firstName,last_name:fields.name};
+  if (registering) row.phone_e164=phone;
+  const saved=await client().from('profiles').upsert(row,{onConflict:'id'});
+  if(saved.error?.code==='23505')throw new Error('Nimewo sa a deja asosye ak yon lòt kont. Konekte ak kont ki deja genyen li a.');
+  requireData(saved);
   const current=useStore.getState().user;
   if(current && current.id!==session.user.id)throw new Error('Sesyon an chanje.');
   if(current){useStore.getState().patchUser(fields);useStore.getState().profileChanged();}

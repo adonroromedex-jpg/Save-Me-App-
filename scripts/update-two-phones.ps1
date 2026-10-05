@@ -35,6 +35,6 @@ $ErrorActionPreference = 'Stop'
             if ($null -eq $result.Code -or $result.Code -ne 0) { throw 'Yon enstalasyon pa konfime.' }
         }
         if ($results.Count -ne 2) { throw 'Pa gen de rezilta enstalasyon.' }
-        Write-Host 'Save Me 1.3 enstale sou toude telefon yo. Done yo konsève.'
+        Write-Host 'Save Me 1.3.1 enstale sou toude telefon yo. Done yo konsève.'
     } finally { Pop-Location }
 }

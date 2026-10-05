@@ -64,3 +64,14 @@ Apply 20261004_chat_experience.sql first, install dependencies, prebuild and bui
 - First-send notice hides and persists across reopen. Test server timestamps 23 hours old: warning appears within 30 seconds and stops after media expiration.
 - Test vault with original personal PIN, wrong PIN and cooldown. Do not reset SecureStore or clear app data to work around an unknown PIN.
 - Enable notifications. Verify Home/tab badges, generic Android notification content, notification tap routes to the proper chat after unlocking, and logout token cleanup. For closed-app push, complete NOTIFICATIONS_SETUP.md and measure scheduler/FCM latency separately.
+
+## 1.3.1 regression checks (physical devices still required)
+
+- Name-only profile edits must succeed for a legacy account whose Auth phone is already owned by another profile. The other account keeps that number; this is not account merging or phone recovery.
+- In Camera → Vault and Gallery → Vault, enter a wrong existing Vault PIN, then the correct PIN. The same selected/captured file remains available while the prompt is open. Cancel/background closes the operation and removes the temporary source after in-flight work settles.
+- In Chat → attachment → Vault, choose a personal photo/video, unlock with the Vault PIN, then create the separate chat media PIN. Confirm the original encrypted Vault item remains and the sent copy has the normal server-based 24-hour expiry. Verify PNG/WebP/MOV as well as JPEG/MP4.
+- The first inbox scan acknowledges old undelivered records silently. A new message received while another chat is open alerts once. Reading/deleting/expiry removes the corresponding presented notification on the next active inbox scan; unread badges follow server read receipts, not just opening a conversation.
+- Cold-start splash fills tall phone displays without white letterboxing and keeps the central logo and animated greeting visible; inspect SM_S911U1 and SM_S921U.
+- Missing/mismatched chat keys still block encryption. Do NOT delete chat_keys, overwrite server keys, uninstall or clear device storage as a troubleshooting step. Identify the account and original key-bearing device first. The update cannot reconstruct a lost private key.
+
+Code verification: prompt retry/cancellation, identity preservation/session checks, duplicate-phone name editing, and notification reconciliation have dedicated regression tests. Android JavaScript export was checked; no physical-device or APK installation test was performed in the workspace.

@@ -1,5 +1,6 @@
 export const uiRefresh = {
   ht: {
+    messageUnavailable: 'Mesaj sa a poko ka dechifre sou aparèy sa a.',
     deliveryTimingHint: "Tan rive: depi sèvè a aksepte mesaj la rive nan konfimasyon aparèy reseptè a. Li enkli tan telefòn nan te offline ak tan verifikasyon an.",
     notifications: "Notifikasyon",
     enableNotifications: "Aktive notifikasyon",
@@ -45,6 +46,7 @@ export const uiRefresh = {
     exchangePilot: 'SAVE ME • ECHANJ 1.2',
   },
   en: {
+    messageUnavailable: 'This message cannot currently be decrypted on this device.',
     deliveryTimingHint: "Arrival time: server acceptance to recipient-device acknowledgement, including time offline and polling delays.",
     notifications: "Notifications",
     enableNotifications: "Enable notifications",
@@ -90,6 +92,7 @@ export const uiRefresh = {
     exchangePilot: 'SAVE ME • EXCHANGE 1.2',
   },
   fr: {
+    messageUnavailable: 'Ce message ne peut pas être déchiffré sur cet appareil pour le moment.',
     deliveryTimingHint: "Arrivée : de l’acceptation serveur à la confirmation de l’appareil destinataire, y compris attente hors ligne et vérifications.",
     notifications: "Notifications",
     enableNotifications: "Activer les notifications",
@@ -135,6 +138,7 @@ export const uiRefresh = {
     exchangePilot: 'SAVE ME • ÉCHANGE 1.2',
   },
   es: {
+    messageUnavailable: 'Este mensaje todavía no se puede descifrar en este dispositivo.',
     deliveryTimingHint: "Llegada: desde la aceptación del servidor hasta la confirmación del dispositivo receptor, incluida la espera sin conexión y las comprobaciones.",
     notifications: "Notificaciones",
     enableNotifications: "Activar notificaciones",

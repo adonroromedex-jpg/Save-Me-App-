@@ -78,3 +78,9 @@ Native compatibility tests compile the production Java module with Android/React
 Automated tests cover authenticated encryption/tamper rejection, SQL RLS with three users, key registration, code lockout, server-controlled dates, text/voice retention, blocks and chunk path validation. SQL tests run in PGlite with deterministic **test-only pgcrypto fixtures**; they do not validate real bcrypt, Supabase Storage HTTP, Cron or device behavior. See [SECURITY.md](SECURITY.md) for the security boundaries and [DEVICE_TESTS.md](DEVICE_TESTS.md) for the required phone checks.
 
 Paid plans remain proposals. No billing or paid access is enabled. Message requests, full Signal ratcheting, key recovery and multi-device support are not implemented. Background push requires the deployment described above.
+
+### Exchange 1.3.1
+
+Name edits no longer reassign phone numbers. Media code errors remain in the prompt so the user can retry the same selection. Chat attachments now include the personal Vault: unlock the source with its Vault PIN, then choose a separate PIN for the sent copy. Incoming notifications are reconciled with server read state; historical undelivered messages are not replayed as fresh local alerts on startup. The welcome artwork fills tall screens while retaining its aspect ratio.
+
+No additional SQL migration is required beyond the 1.3 migration. Redeploy `send-message-notifications` if using remote push to include per-message notification IDs; old sender-only notifications are still reconciled by thread. Identity diagnostics now distinguish a missing local private key from a mismatched key. This does not implement private-key recovery, key rotation, account merging or multi-device login.

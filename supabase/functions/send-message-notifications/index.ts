@@ -19,7 +19,7 @@ Deno.serve(async request => {
    const blocks=await db.from('blocked_contacts').select('owner_id').or(`and(owner_id.eq.${m.sender_id},peer_id.eq.${m.recipient_id}),and(owner_id.eq.${m.recipient_id},peer_id.eq.${m.sender_id})`).limit(1);
    if(blocks.error)throw blocks.error;if(blocks.data?.length){await finish();continue;}
    const {data:device,error:de}=await db.from('push_devices').select('token').eq('user_id',m.recipient_id).maybeSingle();if(de)throw de;if(!device){await finish();continue;}
-   const response=await fetch('https://exp.host/--/api/v2/push/send',{method:'POST',headers:{'Content-Type':'application/json',...(Deno.env.get('EXPO_ACCESS_TOKEN')?{Authorization:`Bearer ${Deno.env.get('EXPO_ACCESS_TOKEN')}`}:{})},body:JSON.stringify({to:device.token,title:'Save Me',body:'New private message',sound:'default',channelId:'messages',data:{sender:m.sender_id,recipient:m.recipient_id},ttl:3600})});
+   const response=await fetch('https://exp.host/--/api/v2/push/send',{method:'POST',headers:{'Content-Type':'application/json',...(Deno.env.get('EXPO_ACCESS_TOKEN')?{Authorization:`Bearer ${Deno.env.get('EXPO_ACCESS_TOKEN')}`}:{})},body:JSON.stringify({to:device.token,title:'Save Me',body:'New private message',sound:'default',channelId:'messages',data:{sender:m.sender_id,recipient:m.recipient_id,messageId:job.message_id},ttl:3600})});
    if(!response.ok)continue;
    const ticket=(await response.json()).data;
    if(ticket?.status==='ok'){const saved=await db.from('push_outbox').update({expo_ticket:ticket.id,last_error:null}).eq('message_id',job.message_id);if(saved.error)throw saved.error;await finish();sent++;}

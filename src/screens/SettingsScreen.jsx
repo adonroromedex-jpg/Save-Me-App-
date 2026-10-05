@@ -140,7 +140,7 @@ export function SettingsScreen({ navigation }) {
         </View>
 
         <View style={ss.section}>
-          <Text style={ss.sectionTitle}>Save Me · 1.3</Text>
+          <Text style={ss.sectionTitle}>Save Me · 1.3.1</Text>
           <Text style={[ss.profileEmail,{padding:14}]}>{t(NativeModules.SaveMeCrypto?.decryptFileAppend ? 'cryptoNative' : 'cryptoCompatibility')}</Text>
           {Object.entries(syncIssues).filter(([,issue])=>issue).map(([kind,issue])=><View key={kind} style={{padding:14}}>
             <Text style={{color:'#FFB7B7',fontWeight:'700'}}>{t(kind==='identity'?'identitySyncIssue':'profileSyncIssue')}</Text>

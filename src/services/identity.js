@@ -8,17 +8,36 @@ const pending = new Map();
 export function ensureIdentity(userId) {
   if (pending.has(userId)) return pending.get(userId);
   const work = (async () => {
+    const db=getSupabaseClient();
+    const checkSession=async()=>{
+      const {data,error}=await db.auth.getSession();
+      if(error)throw error;
+      if(data.session?.user?.id!==userId)throw new Error('Sesyon kont lan chanje. Konekte ak kont ou ankò.');
+    };
+    await checkSession();
     const name = `chat-identity-v1-${userId}`;
     let secret = await SecureStore.getItemAsync(name);
     if (!secret) {
+      const registered=await db.rpc('get_chat_key',{p_peer:userId});
+      if(registered.error)throw registered.error;
+      await checkSession();
+      if(registered.data){
+        const error=new Error('Kle prive kont sa a pa sou telefòn sa a. Ouvri kont lan sou aparèy orijinal li. Pa efase done app la.');
+        error.code='IDENTITY_KEY_MISSING';throw error;
+      }
       secret = encode(await Crypto.getRandomBytesAsync(32));
       await SecureStore.setItemAsync(name, secret, options);
     }
     const pair = keyPair(decode(secret));
     const publicKey = encode(pair.publicKey);
-    const { data, error } = await getSupabaseClient().rpc('register_chat_key', { p_key: publicKey });
+    await checkSession();
+    const { data, error } = await db.rpc('register_chat_key', { p_key: publicKey });
     if (error) throw error;
-    if (data !== publicKey) throw new Error('Kle kont sa a sou yon lòt aparèy. Pa gen restorasyon kle otomatik nan vèsyon sa a.');
+    await checkSession();
+    if (data !== publicKey) {
+      const error=new Error('Kle lokal kont sa a pa koresponn ak kle ki anrejistre a. Verifye kont ou sou chak telefòn. Pa dezenstale app la ni efase done li yo.');
+      error.code='IDENTITY_KEY_MISMATCH';throw error;
+    }
     return { secretKey: pair.secretKey, publicKey };
   })().finally(() => pending.delete(userId));
   pending.set(userId, work);

@@ -11,12 +11,15 @@ import { hasVaultCode } from '../services/vaultCode';
 import { useStore } from '../store/useStore';
 import { deleteVaultFile, importVaultFile, listVaultFiles, openVaultFile, removePickerCopy, removeVaultPreview } from '../services/vault';
 
-export default function VaultScreen() {
+import { sendMedia, sendText } from '../services/messages';
+
+export default function VaultScreen({route,navigation}) {
+  const peer=route.params?.chatPeer;
   const { t } = useTranslation();
   const { askCode, codeModal } = useCodePrompt();
-  const getCode = async () => {
+  const getCode = async (onSubmit) => {
     const exists = await hasVaultCode(userId);
-    return askCode({ title: t(exists ? 'vaultCode' : 'vaultCodeSetup'), hint: t('vaultCodeHint'), create: !exists });
+    return askCode({ title: t(exists ? 'vaultCode' : 'vaultCodeSetup'), hint: t('vaultCodeHint'), create: !exists, onSubmit });
   };
   const userId = useStore(s => s.user?.id);
   const setFiles = useStore(s => s.setFiles);
@@ -55,9 +58,8 @@ export default function VaultScreen() {
     setProgress(0); setBusy(true);
     try {
       if (useStore.getState().isLocked) throw new Error(t('unlockBeforeImport'));
-      const code = await getCode();
+      const code = await getCode(async code=>{const next=await importVaultFile(userId,asset,code.pin,setProgress);updateFiles(next);setFiles(next);});
       if (!code) return;
-      const next = await importVaultFile(userId, asset, code.pin, setProgress); updateFiles(next); setFiles(next);
     }
     catch (e) { Alert.alert(t('vault'), e.message); }
     finally { await removePickerCopy(asset).catch(() => {}); setBusy(false); }
@@ -67,11 +69,23 @@ export default function VaultScreen() {
     if (busy) return;
     setProgress(0); setBusy(true);
     try {
-      const code = await getCode(); if (!code) return;
       const epoch = previewEpoch.current;
-      const uri = await openVaultFile(userId, item, code.pin, setProgress);
-      if (epoch !== previewEpoch.current) { await removeVaultPreview(uri); return; }
-      setPreview({ uri, type: item.type });
+      let uri;
+      const code = await getCode(async code=>{
+        const opened=await openVaultFile(userId,item,code.pin,setProgress);
+        if(epoch!==previewEpoch.current){await removeVaultPreview(opened);return;}
+        uri=opened;
+      });
+      if(!uri)return;
+      if(!code || epoch!==previewEpoch.current){await removeVaultPreview(uri);return;}
+      if(peer){
+        try {
+          const sent=await askCode({create:true,shareOption:true,onSubmit:code=>sendMedia(userId,peer.id,{uri,type:item.type,mimeType:({'png':'image/png','webp':'image/webp','mov':'video/quicktime'})[uri.split('.').pop()]},code.pin,setProgress)});
+          if(!sent)return;
+          if(sent.share)try{await sendText(userId,peer.id,t('sentCode',{code:sent.pin}));}catch{Alert.alert(t('messages'),t('sendFailedCode'));}
+          navigation.setParams({chatPeer:null});navigation.navigate('Messages');
+        } finally {await removeVaultPreview(uri);}
+      }else setPreview({ uri, type: item.type });
     }
     catch (e) { Alert.alert(t('vault'), e.message); }
     finally { setBusy(false); }
@@ -90,6 +104,7 @@ export default function VaultScreen() {
     <View style={s.header}><Text style={s.title}>🔐 {t('vault')}</Text>
       <TouchableOpacity onPress={pickMedia} disabled={busy} style={s.button}><Text style={s.buttonText}>+ {t('addFile')}</Text></TouchableOpacity>
     </View>
+    {!!peer && <TouchableOpacity onPress={()=>navigation.setParams({chatPeer:null})}><Text style={s.hint}>{t('chatTarget',{name:`${peer.first_name||''} ${peer.last_name||''}`})} · {t('cancel')}</Text></TouchableOpacity>}
     <Text style={s.hint}>{t('vaultImportHint')}</Text>
     <TextInput style={s.input} placeholder={t('searchFiles')} placeholderTextColor="#888" value={search} onChangeText={setSearch} />
     {busy && <View style={{alignItems:"center",padding:12,gap:8}}><ActivityIndicator color="#82B9FF" /><Text style={s.hint}>{progress}%</Text></View>}

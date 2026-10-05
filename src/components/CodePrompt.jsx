@@ -1,7 +1,7 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { SecureOverlay } from './SecureOverlay';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState,  View, Text, TextInput, TouchableOpacity, StyleSheet, Switch, ScrollView } from 'react-native';
+import { ActivityIndicator, AppState,  View, Text, TextInput, TouchableOpacity, StyleSheet, Switch, ScrollView } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import { useTranslation } from 'react-i18next';
 
@@ -11,17 +11,31 @@ export function useCodePrompt() {
   const [pin, setPin] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [share, setShare] = useState(false);
-  const resolver = useRef(null);
-  const finish = value => { const resolve = resolver.current; resolver.current = null; setPrompt(null); setPin(''); setConfirmation(''); setShare(false); resolve?.(value); };
+  const [submitting,setSubmitting]=useState(false),[error,setError]=useState('');
+  const resolver = useRef(null),task=useRef(null);
+  const finish = value => { const resolve = resolver.current; resolver.current = null; setPrompt(null); setPin(''); setConfirmation(''); setShare(false); if(task.current){task.current.then(()=>resolve?.(null),()=>resolve?.(null));}else resolve?.(value); };
   useEffect(() => {
     const sub = AppState.addEventListener('change', state => { if (state !== 'active') finish(null); });
-    return () => { sub.remove(); resolver.current?.(null); resolver.current = null; };
+    return () => { sub.remove(); finish(null); };
   }, []);
   useFocusEffect(useCallback(() => () => finish(null), []));
   const askCode = options => new Promise(resolve => {
     resolver.current?.(null); resolver.current = resolve;
-    setPin(''); setConfirmation(''); setShare(false); setPrompt(options);
+    setPin(''); setConfirmation(''); setShare(false); setError(''); setSubmitting(false); setPrompt(options);
   });
+  const submit = async () => {
+    if(task.current || submitting || !valid)return;
+    const current=resolver.current;
+    const value={pin,share};setSubmitting(true);setError('');
+    try {
+      if(prompt.onSubmit){
+        const running=Promise.resolve().then(()=>prompt.onSubmit(value));task.current=running;
+        try{await running;}finally{if(task.current===running)task.current=null;}
+      }
+      if(resolver.current===current)finish(value);
+    } catch(e) { if(resolver.current===current)setError(e.message || String(e)); }
+    finally { if(resolver.current===current)setSubmitting(false); }
+  };
   const generate = async () => {
     // Rejection sampling avoids modulo bias; code is not the encryption key.
     const bytes = await Crypto.getRandomBytesAsync(32);
@@ -42,8 +56,10 @@ export function useCodePrompt() {
         <View style={s.row}><Text style={[s.hint,{flex:1}]}>{t('shareCode')}</Text><Switch value={share} onValueChange={setShare} /></View>
         <Text style={s.hint}>{t('shareCodeWarning')}</Text>
       </>}
-      <View style={s.row}><TouchableOpacity style={s.button} onPress={() => finish(null)}><Text style={s.link}>{t('cancel')}</Text></TouchableOpacity>
-        <TouchableOpacity style={[s.button,{opacity:valid?1:0.35}]} disabled={!valid} onPress={() => finish({ pin, share })}><Text style={s.link}>{t('continue')}</Text></TouchableOpacity></View>
+      {submitting && <ActivityIndicator color="#82B9FF" />}
+      {!!error && <Text accessibilityLiveRegion="polite" style={{color:'#FFB4B4',marginVertical:8}}>{error}</Text>}
+      <View style={s.row}><TouchableOpacity disabled={submitting} style={s.button} onPress={() => finish(null)}><Text style={s.link}>{t('cancel')}</Text></TouchableOpacity>
+        <TouchableOpacity style={[s.button,{opacity:valid?1:0.35}]} disabled={!valid || submitting} onPress={submit}><Text style={s.link}>{t('continue')}</Text></TouchableOpacity></View>
     </ScrollView></View>
   </SecureOverlay>;
   return { askCode, codeModal };

@@ -204,14 +204,14 @@ export default function MessagesScreen({ navigation }) {
     if(result.canceled || !result.assets?.[0])return;
     const asset=result.assets[0];setBusy(true);
     try{
-      const code=await askCode({create:true,shareOption:true});if(!code)return;
-      await sendMedia(user.id,peer.id,asset,code.pin,setProgress);await noteSent();
+      const code=await askCode({create:true,shareOption:true,onSubmit:code=>sendMedia(user.id,peer.id,asset,code.pin,setProgress)});if(!code)return;
+      await noteSent();
       if(code.share)try{await sendText(user.id,peer.id,t('sentCode',{code:code.pin}));}catch{Alert.alert(t('messages'),t('sendFailedCode'));}
       await refresh();
     }catch(e){Alert.alert(t('messages'),e.message);}finally{await removePickerCopy(asset).catch(()=>{});setBusy(false);setProgress(null);}
   };
   const attachments=()=>Alert.alert(t('attachment'),'',[
-    {text:t('fromGallery'),onPress:pickMedia},{text:t('fromCamera'),onPress:()=>navigation.navigate('Camera',{chatPeer:peer})},{text:t('cancel'),style:'cancel'}]);
+    {text:t('fromGallery'),onPress:pickMedia},{text:t('vault'),onPress:()=>navigation.navigate('Vault',{chatPeer:peer})},{text:t('fromCamera'),onPress:()=>navigation.navigate('Camera',{chatPeer:peer})},{text:t('cancel'),style:'cancel'}]);
   const viewMedia=async message=>{
     if(busy)return;
     if(!message.media_parts){Alert.alert(t('messages'),t('upgradeMedia'));return;}
@@ -321,7 +321,7 @@ export default function MessagesScreen({ navigation }) {
             {(item.sender_id===user.id?ownAvatar:peerAvatar)?<Image source={{uri:item.sender_id===user.id?ownAvatar:peerAvatar}} style={{width:36,height:36,borderRadius:18}} />:<View style={{width:36,height:36,borderRadius:18,backgroundColor:'#254766',alignItems:'center',justifyContent:'center'}}><Text style={s.message}>{item.sender_id===user.id?`${user.firstName?.[0]||''}${user.name?.[0]||''}`:`${peer.first_name?.[0]||''}${peer.last_name?.[0]||''}`}</Text></View>}
             <Ionicons name="play-circle" size={38} color="#FFFFFF" /><Text style={s.message}>{t('listen')}</Text>
           </View>}
-          <Text style={s.message}>{item.decryptError || item.body || `🔒 ${kindLabel(item.media_kind)}`}</Text>
+          <Text style={s.message}>{(item.decryptError ? t('messageUnavailable') : item.body) || `🔒 ${kindLabel(item.media_kind)}`}</Text>
           {item.legacy && <Text style={s.time}>{t('legacyMessage')}</Text>}
           {!!item.expires_at && <Text style={s.time}>{expiryLabel(item)}</Text>}
           <View style={{flexDirection:'row',alignItems:'center',gap:7}}><Text style={s.time}>{new Date(item.created_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</Text>

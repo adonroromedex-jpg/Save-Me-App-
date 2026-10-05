@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, StatusBar, StyleSheet, View } from 'react-native';
 
 const DURATION_MS = 3000;
-const ART_RATIO = 9 / 16;
+const ART_RATIO = 941 / 1672;
 
 export default function SplashScreen({ onFinish }) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -23,8 +23,9 @@ export default function SplashScreen({ onFinish }) {
     return () => { clearTimeout(timer); animation.stop(); };
   }, [loaded, opacity]);
 
-  // Keep the entire artwork visible, including on short screens and tablets.
-  const width = Math.min(layout.width, layout.height * ART_RATIO);
+  // Fill tall phones without white bands; fit shorter displays to keep the logo visible.
+  const tallPhone=layout.height>0 && layout.width/layout.height<ART_RATIO;
+  const width = tallPhone ? layout.height * ART_RATIO : Math.min(layout.width, layout.height * ART_RATIO);
   const height = width / ART_RATIO;
   return <View style={s.container} onLayout={({ nativeEvent }) => setLayout(nativeEvent.layout)}>
     <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -33,16 +34,16 @@ export default function SplashScreen({ onFinish }) {
         resizeMode="contain" accessible={false} onLoad={() => setLoaded(true)} onError={() => setLoaded(true)} />
       <Animated.View style={[s.greeting, { opacity }]}>
         <Animated.Text accessibilityRole="header" allowFontScaling={false}
-          style={[s.welcome, { fontSize: Math.min(width * 0.14, 64) }]}>Welcome</Animated.Text>
+          style={[s.welcome, { fontSize: Math.min(layout.width * 0.14, 64) }]}>Welcome</Animated.Text>
         <Animated.Text allowFontScaling={false}
-          style={[s.subtitle, { fontSize: Math.min(width * 0.042, 20) }]}>SaveMe please</Animated.Text>
+          style={[s.subtitle, { fontSize: Math.min(layout.width * 0.042, 20) }]}>SaveMe please</Animated.Text>
       </Animated.View>
     </View>
   </View>;
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, overflow: 'hidden', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   greeting: { position: 'absolute', top: '65%', left: '5%', right: '5%', alignItems: 'center' },
   welcome: { color: '#073CA8', fontWeight: '800', textAlign: 'center', letterSpacing: -1 },
   subtitle: { color: '#2359B0', fontWeight: '400', textAlign: 'center', marginTop: 10, letterSpacing: 0.6 },

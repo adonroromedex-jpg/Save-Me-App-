@@ -26,14 +26,13 @@ export function CameraScreen({ route, navigation }) {
     try{
       if(token!==valid.current || AppState.currentState!=='active' || useStore.getState().isLocked)return;
       if(peer){
-        const code=await askCode({create:true,shareOption:true});if(!code)return;
-        await sendMedia(userId,peer.id,asset,code.pin,setProgress);
+        const code=await askCode({create:true,shareOption:true,onSubmit:code=>sendMedia(userId,peer.id,asset,code.pin,setProgress)});if(!code)return;
         if(code.share)try{await sendText(userId,peer.id,t('sentCode',{code:code.pin}));}catch{Alert.alert(t('messages'),t('sendFailedCode'));}
         navigation.setParams({chatPeer:null});navigation.navigate('Messages');
       }else{
         const exists=await hasVaultCode(userId);
-        const code=await askCode({title:t(exists?'vaultCode':'vaultCodeSetup'),hint:t('vaultCodeHint'),create:!exists});if(!code)return;
-        setFiles(await importVaultFile(userId,asset,code.pin,setProgress));Alert.alert(t('camera'),t('captureSaved'));
+        const code=await askCode({title:t(exists?'vaultCode':'vaultCodeSetup'),hint:t('vaultCodeHint'),create:!exists,onSubmit:async code=>setFiles(await importVaultFile(userId,asset,code.pin,setProgress))});if(!code)return;
+        Alert.alert(t('camera'),t('captureSaved'));
       }
     }finally{await removePickerCopy(asset).catch(()=>{});}
   };
